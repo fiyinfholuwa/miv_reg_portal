@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable([
@@ -23,6 +24,9 @@ use Laravel\Sanctum\HasApiTokens;
     'attendance_days',
     'needs_accommodation',
     'registration_completed_at',
+    'is_admin',
+    'approval_status',
+    'ticket_code',
 ])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
@@ -43,11 +47,22 @@ class User extends Authenticatable
             'attendance_days' => 'array',
             'needs_accommodation' => 'boolean',
             'registration_completed_at' => 'datetime',
+            'is_admin' => 'boolean',
         ];
     }
 
     public function hasCompletedRegistration(): bool
     {
         return $this->registration_completed_at !== null;
+    }
+
+    public function testimonials(): HasMany
+    {
+        return $this->hasMany(Testimonial::class);
+    }
+
+    public function feedback(): HasMany
+    {
+        return $this->hasMany(Feedback::class);
     }
 }

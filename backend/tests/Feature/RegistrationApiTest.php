@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Mail\RegistrationOtpMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class RegistrationApiTest extends TestCase
@@ -96,5 +97,49 @@ class RegistrationApiTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('status', 'authenticated')
             ->assertJsonPath('profile_required', true);
+    }
+
+    public function test_authenticated_user_can_submit_testimony_and_feedback(): void
+    {
+        $user = \App\Models\User::factory()->create();
+        $token = $user->createToken('test')->plainTextToken;
+
+        $this->withToken($token)->postJson('/api/auth/testimonials', [
+            'type' => 'Write',
+            'content' => 'The conference gave our ministry a clear next step.',
+            'topic' => 'Ministry',
+            'show_name' => true,
+        ])->assertCreated()->assertJsonPath('status', 'submitted');
+
+        $this->withToken($token)->postJson('/api/auth/feedback', [
+            'likelihood' => 5,
+            'ratings' => ['Registration' => 5, 'Venue & seating' => 4],
+            'highlight' => 'Worship',
+            'improvement' => 'Add more shuttle times.',
+        ])->assertOk()->assertJsonPath('message', 'Thank you. Your feedback has been recorded.');
+    }
+
+    public function test_admin_can_login_review_and_create_broadcast(): void
+    {
+        $admin = \App\Models\User::factory()->create([
+            'email' => 'admin@test.local',
+            'password' => Hash::make('secret-password'),
+            'is_admin' => true,
+        ]);
+
+        $login = $this->postJson('/api/admin/login', [
+            'email' => $admin->email,
+            'password' => 'secret-password',
+        ])->assertOk();
+
+        $token = $login->json('token');
+
+        $this->withToken($token)->getJson('/api/admin/overview')->assertOk()->assertJsonStructure(['registered', 'onsite', 'online', 'daily']);
+
+        $this->withToken($token)->postJson('/api/admin/broadcasts', [
+            'title' => 'Gate update',
+            'body' => 'Gate B opens at 1:15 PM.',
+            'status' => 'sent',
+        ])->assertCreated()->assertJsonPath('message', 'Broadcast saved.');
     }
 }

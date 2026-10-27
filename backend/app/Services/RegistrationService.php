@@ -25,6 +25,7 @@ class RegistrationService
             'name' => 'Pending delegate',
             'email' => $email,
             'password' => Str::random(64),
+            'approval_status' => 'pending',
         ]);
 
         RegistrationOtp::where('user_id', $user->id)
@@ -98,6 +99,7 @@ class RegistrationService
         $user->forceFill([
             ...$attributes,
             'registration_completed_at' => now(),
+            'ticket_code' => $user->ticket_code ?: $this->newTicketCode(),
         ])->save();
 
         return $this->userPayload($user->fresh());
@@ -149,6 +151,18 @@ class RegistrationService
             'needs_accommodation' => $user->needs_accommodation,
             'email_verified' => $user->email_verified_at !== null,
             'registration_completed' => $user->hasCompletedRegistration(),
+            'approval_status' => $user->approval_status,
+            'ticket_code' => $user->ticket_code,
+            'is_admin' => $user->is_admin,
         ];
+    }
+
+    private function newTicketCode(): string
+    {
+        do {
+            $code = 'JC27-DLG-' . random_int(10000, 99999);
+        } while (User::where('ticket_code', $code)->exists());
+
+        return $code;
     }
 }
