@@ -1,0 +1,7 @@
+'use client';
+
+import { Arrow } from './ConferenceAtoms';
+
+export default function RegistrationForm() {
+  return <form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); window.dispatchEvent(new Event('open-registration-modal')); }}><label className="text-sm font-semibold sm:col-span-2">Full name<input required className="mt-2 w-full rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none placeholder:text-white/35 focus:border-[#ffcf96]" placeholder="Your name" /></label><label className="text-sm font-semibold">Email address<input required type="email" className="mt-2 w-full rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none placeholder:text-white/35" placeholder="you@example.com" /></label><label className="text-sm font-semibold">WhatsApp number<input className="mt-2 w-full rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none placeholder:text-white/35" placeholder="+234" /></label><label className="text-sm font-semibold sm:col-span-2">Attendance mode<select className="mt-2 w-full rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none focus:border-[#ffcf96]"><option className="text-ink">On-site at LMCC</option><option className="text-ink">Virtual / livestream</option></select></label><button className="button-light mt-2 w-full sm:col-span-2" type="submit">Continue registration <Arrow /></button></form>;
+}

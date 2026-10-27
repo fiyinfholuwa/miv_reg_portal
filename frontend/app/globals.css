@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter: 'DM Sans';
+  --font-display: 'Barlow Condensed';
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: #f6f2e9;
+  color: #071d36;
+  font-family: var(--font-inter), Arial, sans-serif;
+}
+
+::selection { background: #cf4437; color: #fffaf0; }
+
+@layer components {
+  .container-shell { @apply mx-auto w-[min(100%-2rem,1180px)]; }
+  .eyebrow { @apply text-[11px] font-bold uppercase tracking-[0.22em] text-coral; }
+  .display-title { @apply font-display text-[clamp(3.5rem,8vw,7.6rem)] font-bold uppercase leading-[0.82] tracking-[-0.04em]; }
+  .section-title { @apply font-display text-[clamp(3rem,7vw,6.2rem)] font-bold uppercase leading-[0.82] tracking-[-0.035em]; }
+  .button-primary { @apply inline-flex items-center justify-center rounded-full bg-coral px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:-translate-y-0.5 hover:bg-[#b9382d] focus:outline-none focus:ring-4 focus:ring-coral/30; }
+  .button-light { @apply inline-flex items-center justify-center rounded-full bg-cream px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] text-ink transition hover:-translate-y-0.5 hover:bg-white focus:outline-none focus:ring-4 focus:ring-white/30; }
+  .card { @apply rounded-[1.6rem] border border-ink/10 bg-white shadow-soft; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

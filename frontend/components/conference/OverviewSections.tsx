@@ -1,0 +1,27 @@
+import { Arrow, ExperienceCard, ImageCard, Stat } from './ConferenceAtoms';
+import { images, ministers } from './conference-data';
+
+export function StatsSection() {
+  return <section className="border-b border-ink/10 bg-white py-6"><div className="container-shell grid grid-cols-2 gap-5 sm:grid-cols-4 sm:gap-8"><Stat number="6" label="Days of gathering" /><Stat number="₦0" label="Free registration" /><Stat number="1,300" label="Plenary capacity" /><Stat number="16–45" label="Young leaders focus" /></div></section>;
+}
+
+export function AboutSection() {
+  return (
+    <section id="about" className="container-shell grid gap-12 py-20 sm:py-24 lg:grid-cols-[.85fr_1.15fr] lg:py-32">
+      <div><p className="eyebrow mb-5">Why you should join</p><h2 className="section-title max-w-lg">The biggest <span className="text-coral">conference</span> of the year.</h2><p className="mt-8 max-w-md text-base leading-7 text-ink/65 sm:text-lg sm:leading-8">MIV brings leaders together to think clearly, worship deeply, and leave with a practical mandate for the year ahead.</p><a className="mt-8 inline-flex items-center gap-2 font-bold text-coral" href="#register">Make room for it <Arrow /></a></div>
+      <div className="grid gap-4 sm:grid-cols-2"><ImageCard src={images.crowd} label="A room full of possibility" className="sm:mt-16" /><ImageCard src={images.speaker} label="Voices that sharpen vision" /><ImageCard src={images.worship} label="Moments that stay with you" className="sm:col-span-2 sm:mx-16" /></div>
+    </section>
+  );
+}
+
+export function ExperienceSection() {
+  return <section className="bg-navy py-20 text-white sm:py-24 lg:py-32"><div className="container-shell"><div className="mb-12 flex flex-wrap items-end justify-between gap-8"><div><p className="eyebrow mb-5 text-[#ff7565]">What to expect</p><h2 className="section-title max-w-2xl">Get ready for a <span className="text-[#ff7565]">rich</span> experience.</h2></div><p className="max-w-xs text-sm leading-6 text-sky/70">One conference. Many rooms for growth, connection, and conviction.</p></div><div className="grid gap-4 md:grid-cols-3"><ExperienceCard number="01" title="Global networking" text="Meet like-minded leaders from every corner of the world and build relationships that outlive the conference." /><ExperienceCard number="02" title="World-class voices" text="Gain fresh perspective from leaders in ministry, leadership, and innovation." /><ExperienceCard number="03" title="Powerful sessions" text="Make space for worship, teaching, and the kind of clarity that moves you forward." /></div></div></section>;
+}
+
+export function HostsSection() {
+  return <section id="speakers" className="container-shell grid gap-12 py-20 sm:py-24 lg:grid-cols-[.85fr_1.15fr] lg:py-32"><div className="order-2 lg:order-1"><div className="overflow-hidden rounded-[2rem] bg-sky"><div className="aspect-[.86] bg-cover bg-center" style={{ backgroundImage: `url(${images.hosts}), url(${images.speaker})` }} /><div className="flex gap-2 bg-ink px-5 py-4 text-xs font-bold uppercase tracking-[0.12em] text-white"><span>Mummy · Rev. Stella</span><span className="text-white/35">|</span><span>Daddy · Rev. Samson</span></div></div></div><div className="order-1 flex flex-col justify-center lg:order-2"><p className="eyebrow mb-5">Meet the hosts</p><h2 className="section-title">Rev. Samson<br /><span className="text-coral">& Stella</span><br />Ajetomobi</h2><p className="mt-7 max-w-xl text-base leading-7 text-ink/65 sm:text-lg sm:leading-8">Dedicated ministers and visionary leaders with a shared passion for advancing God’s Kingdom, developing leaders, and strengthening families.</p><div className="mt-8 flex flex-wrap gap-3"><span className="rounded-full border border-ink/15 px-4 py-2 text-sm font-semibold">President · MIV</span><span className="rounded-full border border-ink/15 px-4 py-2 text-sm font-semibold">Leadership & missions</span></div></div></section>;
+}
+
+export function MinistersSection() {
+  return <section className="bg-white py-20 sm:py-24 lg:py-32"><div className="container-shell"><div className="mb-10 flex flex-wrap items-end justify-between gap-6"><div><p className="eyebrow mb-5">The voices in the room</p><h2 className="section-title">Minis<span className="text-coral">tering</span></h2></div><p className="max-w-xs text-sm leading-6 text-ink/55">Meet the hosts and watch this space for more speakers announced soon.</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{ministers.map((minister, index) => <article key={`${minister.name}-${index}`} className={`group ${index > 1 ? 'opacity-80' : ''}`}><div className="relative aspect-[.82] overflow-hidden rounded-[1.5rem] border border-ink/10 bg-[#eee9df]"><div className="absolute inset-0 bg-cover bg-center grayscale-[.1] transition duration-700 group-hover:scale-105" style={{ backgroundImage: `linear-gradient(180deg, transparent 38%, rgba(7,29,54,.78)), url(${minister.image})` }} /><span className={`absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${index > 1 ? 'bg-[#e8dfc7] text-ink/55' : 'bg-coral text-white'}`}>{minister.status}</span>{index > 1 && <span className="absolute inset-x-0 top-1/2 text-center font-display text-3xl uppercase leading-none text-white/90">Coming<br />soon</span>}</div><h3 className="mt-4 font-display text-2xl uppercase leading-none">{minister.name}</h3><p className="mt-2 text-sm leading-5 text-ink/55">{minister.role}</p></article>)}</div></div></section>;
+}

@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Production builds
+dist/
+build/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# macOS / editor files
+.DS_Store
+.vscode/
