@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api';
+
 const navigation = [
   { label: 'Overview', icon: '⌂' },
   { label: 'Registrants', icon: '◌' },
@@ -38,7 +40,11 @@ export default function AdminDashboard() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
 
-  const logout = () => {
+  const logout = async () => {
+    const token = window.localStorage.getItem('jan-conf-session');
+    if (token) {
+      await fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } }).catch(() => undefined);
+    }
     window.localStorage.removeItem('jan-conf-session');
     window.location.assign('/');
   };

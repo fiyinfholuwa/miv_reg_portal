@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api';
+
 type DashboardPage = 'Home' | 'Programme' | 'My pass' | 'Live' | 'Testimonials' | 'Attending card' | 'My team' | 'Publicity kit' | 'Store' | 'Hotels & travel';
 
 const navigation: { label: DashboardPage; icon: string }[] = [
@@ -81,7 +83,11 @@ export default function UserDashboard() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [onlineMode, setOnlineMode] = useState(false);
 
-  const logout = () => {
+  const logout = async () => {
+    const token = window.localStorage.getItem('jan-conf-session');
+    if (token) {
+      await fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } }).catch(() => undefined);
+    }
     window.localStorage.removeItem('jan-conf-session');
     window.location.assign('/');
   };
