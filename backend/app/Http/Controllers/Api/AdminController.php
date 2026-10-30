@@ -9,6 +9,7 @@ use App\Http\Requests\ReviewRequest;
 use App\Http\Requests\PartnerInquiryReviewRequest;
 use App\Http\Requests\ShopProductRequest;
 use App\Services\AdminService;
+use App\Services\ShopOrderService;
 use App\Models\PartnerInquiry;
 use App\Models\ShopProduct;
 use App\Models\Testimonial;
@@ -87,6 +88,13 @@ class AdminController extends Controller
     public function partnerInquiries(Request $request): JsonResponse
     {
         return response()->json(['inquiries' => $this->adminService->partnerInquiries($request->user())]);
+    }
+
+    public function shopOrders(Request $request): JsonResponse
+    {
+        $this->adminService->ensureAdmin($request->user());
+
+        return response()->json(['orders' => app(ShopOrderService::class)->adminOrders($request->user())]);
     }
 
     public function reviewPartnerInquiry(PartnerInquiryReviewRequest $request, PartnerInquiry $inquiry): JsonResponse

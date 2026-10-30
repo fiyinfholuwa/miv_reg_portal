@@ -29,6 +29,7 @@ export default function RegistrationModal() {
   const [accommodation, setAccommodation] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [returnTo, setReturnTo] = useState('/dashboard');
 
   useEffect(() => {
     const openFromLink = (event: MouseEvent) => {
@@ -37,9 +38,14 @@ export default function RegistrationModal() {
       const link = target.closest('a[href="#register"]');
       if (!link) return;
       event.preventDefault();
+      setReturnTo('/dashboard');
       setOpen(true);
     };
-    const openFromForm = () => setOpen(true);
+    const openFromForm = (event: Event) => {
+      const detail = event instanceof CustomEvent && typeof event.detail === 'object' && event.detail !== null ? event.detail as { returnTo?: string } : {};
+      setReturnTo(detail.returnTo || '/dashboard');
+      setOpen(true);
+    };
     document.addEventListener('click', openFromLink);
     window.addEventListener('open-registration-modal', openFromForm);
     return () => {
@@ -73,7 +79,7 @@ export default function RegistrationModal() {
           if (data.profile_required) {
             setStep('about');
           } else {
-            router.push('/dashboard');
+            router.push(returnTo);
             close();
           }
         } else {
@@ -104,7 +110,7 @@ export default function RegistrationModal() {
       const response = await fetch(apiUrl('/auth/profile'), { method: 'PUT', headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: fullName, phone, role, church, state_country: stateCountry, attendance_mode: attendance, attendance_days: days, needs_accommodation: accommodation }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message ?? 'We could not save your registration.');
-      router.push('/dashboard');
+      router.push(returnTo);
       close();
     } catch (submissionError) {
       setError(submissionError instanceof TypeError ? 'We could not reach the registration server. Check that the backend is running locally or set NEXT_PUBLIC_API_URL to the public API URL before deploying.' : submissionError instanceof Error ? submissionError.message : 'Something went wrong. Please try again.');

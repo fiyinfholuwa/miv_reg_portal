@@ -39,9 +39,15 @@ Route::prefix('admin')->group(function (): void {
         Route::delete('/shop/products/{product}', [AdminController::class, 'deleteShopProduct']);
         Route::get('/partner-inquiries', [AdminController::class, 'partnerInquiries']);
         Route::patch('/partner-inquiries/{inquiry}/review', [AdminController::class, 'reviewPartnerInquiry']);
+        Route::get('/shop/orders', [AdminController::class, 'shopOrders']);
     });
 });
 
 Route::get('/user', [RegistrationController::class, 'user'])->middleware('auth:sanctum');
 Route::get('/shop/products', [ShopController::class, 'products']);
 Route::post('/partner-inquiries', [ShopController::class, 'partnerInquiry']);
+Route::middleware('auth:sanctum')->prefix('shop')->group(function (): void {
+    Route::post('/orders/initialize', [ShopController::class, 'initializeOrder']);
+    Route::get('/orders/{reference}/verify', [ShopController::class, 'verifyOrder']);
+    Route::get('/orders', [ShopController::class, 'orders']);
+});

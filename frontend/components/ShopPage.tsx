@@ -18,7 +18,7 @@ type Product = {
   stock?: number | null;
 };
 
-const fallbackProducts: Product[] = merch.map((item) => ({ ...item, price: Number(item.price.replace(/[^0-9]/g, '')), description: 'Official Jan. Conf 2027 merchandise.' }));
+const fallbackProducts: Product[] = merch.map((item, index) => ({ ...item, id: index + 1, price: Number(item.price.replace(/[^0-9]/g, '')), description: 'Official Jan. Conf 2027 merchandise.' }));
 
 export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>(fallbackProducts);
@@ -26,6 +26,8 @@ export default function ShopPage() {
   const [notice, setNotice] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [paymentNotice, setPaymentNotice] = useState('');
 
   useEffect(() => {
     const savedCart = window.localStorage.getItem('jan-conf-cart');
@@ -34,6 +36,16 @@ export default function ShopPage() {
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('Shop unavailable')))
       .then((data) => { if (Array.isArray(data.products) && data.products.length) setProducts(data.products); })
       .catch(() => undefined);
+
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get('reference');
+    if (params.get('payment') === 'success' && reference && window.localStorage.getItem('jan-conf-session')) {
+      setPaymentNotice('Confirming your payment…');
+      void fetch(apiUrl(`/shop/orders/${encodeURIComponent(reference)}/verify`), { headers: { Accept: 'application/json', Authorization: `Bearer ${window.localStorage.getItem('jan-conf-session')}` } })
+        .then(async (response) => { const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.message || data.errors?.payment?.[0] || 'Payment verification failed.'); return data; })
+        .then((data) => { window.localStorage.removeItem('jan-conf-cart'); setCart({}); setPaymentNotice(`Payment confirmed. Your pickup code is ${data.order.pickup_code}.`); window.history.replaceState({}, '', '/shop'); })
+        .catch((error) => setPaymentNotice(error instanceof Error ? error.message : 'Payment verification failed.'));
+    }
   }, []);
 
   useEffect(() => {
@@ -49,14 +61,29 @@ export default function ShopPage() {
     window.setTimeout(() => setNotice(''), 2200);
   };
 
-  const checkout = () => {
+  const checkout = async () => {
     if (!total) return;
     if (!window.localStorage.getItem('jan-conf-session')) {
       setNotice('Please sign in or register before checkout.');
-      window.dispatchEvent(new Event('open-registration-modal'));
+      window.dispatchEvent(new CustomEvent('open-registration-modal', { detail: { returnTo: '/shop' } }));
       return;
     }
-    setNotice('You are signed in. Your cart is ready for checkout at the delegate store.');
+    const items = products.filter((product) => cart[product.name] && product.id).map((product) => ({ product_id: product.id, quantity: cart[product.name] }));
+    if (!items.length) {
+      setNotice('Refresh the shop before checking out so we can confirm the products.');
+      return;
+    }
+    setCheckingOut(true);
+    setNotice('Opening secure payment…');
+    try {
+      const response = await fetch(apiUrl('/shop/orders/initialize'), { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${window.localStorage.getItem('jan-conf-session')}` }, body: JSON.stringify({ items }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || data.errors?.payment?.[0] || data.errors?.items?.[0] || 'Could not start payment.');
+      window.location.assign(data.authorization_url);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not start payment.');
+      setCheckingOut(false);
+    }
   };
 
   const cartQuantity = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
@@ -90,12 +117,12 @@ export default function ShopPage() {
       </nav>}
     </header>
 
-    <button type="button" onClick={() => { setCartOpen(true); document.getElementById('shop-cart')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} className="fixed right-4 top-24 z-40 grid h-14 w-14 place-items-center rounded-full bg-white text-2xl text-ink shadow-xl ring-4 ring-[#f6f2e9] transition hover:scale-105" aria-label={`Open cart, ${cartQuantity} item${cartQuantity === 1 ? '' : 's'}`}>
+    <Link href="/shop/cart" className="fixed right-4 top-24 z-40 grid h-14 w-14 place-items-center rounded-full bg-white text-2xl text-ink shadow-xl ring-4 ring-[#f6f2e9] transition hover:scale-105" aria-label={`Open cart, ${cartQuantity} item${cartQuantity === 1 ? '' : 's'}`}>
       <svg className="fa fa-shopping-cart h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1" /><circle cx="18" cy="20" r="1" /><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.5h7.8a2 2 0 0 0 1.9-1.4L21 8H6" /></svg>{cartQuantity > 0 && <span className="absolute -right-1 -top-1 grid h-6 min-w-6 place-items-center rounded-full bg-[#d7263d] px-1 text-xs font-bold text-white">{cartQuantity}</span>}
-    </button>
+    </Link>
 
     <section className="container-shell py-16 sm:py-24">
-      <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between"><div><p className="eyebrow mb-5">Pay online · collect at the venue</p><h1 className="section-title">Conference<br /><span className="text-coral">shop.</span></h1><p className="mt-6 max-w-xl text-base leading-7 text-ink/65">Browse the official Revival collection before you register. You only need to sign in when you are ready to check out.</p></div><div id="shop-cart" className={`rounded-[1.5rem] bg-ink p-6 text-white lg:w-80 ${cartOpen ? 'ring-4 ring-coral/30' : ''}`}><div className="flex items-start justify-between gap-3"><div><p className="eyebrow text-[#ff7565]">Your cart</p><strong className="mt-2 block font-display text-5xl">{cartQuantity}</strong><p className="mt-1 text-sm text-sky/70">items · ₦{total.toLocaleString()}</p></div><button type="button" onClick={() => setCartOpen(false)} className="text-xs font-bold uppercase tracking-[.08em] text-white/60 hover:text-white">{cartOpen ? 'Close' : 'View'}</button></div><button type="button" onClick={checkout} disabled={!total} className="mt-5 w-full rounded-full bg-cream px-5 py-3 text-sm font-bold text-ink disabled:cursor-not-allowed disabled:opacity-40">Proceed to checkout</button>{notice && <p className="mt-4 text-sm leading-5 text-[#ffcf96]" role="status">{notice}</p>}</div></div>
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between"><div><p className="eyebrow mb-5">Pay online · collect at the venue</p><h1 className="section-title">Conference<br /><span className="text-coral">shop.</span></h1><p className="mt-6 max-w-xl text-base leading-7 text-ink/65">Browse the official Revival collection before you register. You only need to sign in when you are ready to check out.</p></div><div id="shop-cart" className={`rounded-[1.5rem] bg-ink p-6 text-white lg:w-80 ${cartOpen ? 'ring-4 ring-coral/30' : ''}`}><div className="flex items-start justify-between gap-3"><div><p className="eyebrow text-[#ff7565]">Your cart</p><strong className="mt-2 block font-display text-5xl">{cartQuantity}</strong><p className="mt-1 text-sm text-sky/70">items · ₦{total.toLocaleString()}</p></div><button type="button" onClick={() => setCartOpen(false)} className="text-xs font-bold uppercase tracking-[.08em] text-white/60 hover:text-white">{cartOpen ? 'Close' : 'View'}</button></div><button type="button" onClick={() => void checkout()} disabled={!total || checkingOut} className="mt-5 w-full rounded-full bg-cream px-5 py-3 text-sm font-bold text-ink disabled:cursor-not-allowed disabled:opacity-40">{checkingOut ? 'Opening payment…' : 'Proceed to checkout'}</button>{notice && <p className="mt-4 text-sm leading-5 text-[#ffcf96]" role="status">{notice}</p>}{paymentNotice && <p className="mt-4 rounded-xl bg-white/10 p-3 text-sm leading-5 text-[#ffcf96]" role="status">{paymentNotice}</p>}</div></div>
       <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{products.map((product) => <article key={product.id ?? product.name} className="group rounded-[1.5rem] border border-ink/10 bg-white p-3 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"><Link href={`/shop/${productSlug(product.name)}`} className="block"><div className="relative aspect-[.92] overflow-hidden rounded-[1.2rem] bg-[#e7edf3]"><img src={product.image || '/images/miv-logo.png'} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />{product.tag && <span className="absolute left-3 top-3 rounded-full bg-cream px-3 py-1 text-[10px] font-bold uppercase tracking-[.1em]">{product.tag}</span>}</div><div className="p-2 pt-5"><div className="flex items-start justify-between gap-3"><h2 className="font-display text-2xl uppercase leading-none">{product.name}</h2><strong className="shrink-0 text-sm">₦{product.price.toLocaleString()}</strong></div><p className="mt-3 min-h-12 text-sm leading-5 text-ink/55">{product.description || 'Official conference merchandise.'}</p><span className="mt-4 inline-block text-xs font-bold uppercase tracking-[.1em] text-coral">View product details →</span></div></Link><button type="button" onClick={() => addToCart(product)} className="mt-5 w-full rounded-full bg-[#1469a9] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#0b4779]">Add to cart</button></article>)}</div>
     </section>
 
