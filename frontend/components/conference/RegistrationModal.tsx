@@ -2,10 +2,9 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiUrl } from '../../lib/api';
 
 type Step = 'email' | 'otp' | 'about' | 'attendance';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api';
 
 const stepDetails: { key: Step; label: string; detail: string }[] = [
   { key: 'email', label: 'Email', detail: 'Your sign-in' },
@@ -66,7 +65,7 @@ export default function RegistrationModal() {
 
     try {
       if (step === 'email') {
-        const response = await fetch(`${API_URL}/auth/start`, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ email, device_name: 'jan-conf-web' }) });
+        const response = await fetch(apiUrl('/auth/start'), { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ email, device_name: 'jan-conf-web' }) });
         const data = await response.json();
         if (!response.ok) throw new Error(data.message ?? 'We could not start registration.');
         if (data.status === 'authenticated') {
@@ -88,7 +87,7 @@ export default function RegistrationModal() {
           setError('Enter the 6-digit code sent to your email.');
           return;
         }
-        const response = await fetch(`${API_URL}/auth/verify-otp`, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ email, otp, device_name: 'jan-conf-web' }) });
+        const response = await fetch(apiUrl('/auth/verify-otp'), { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ email, otp, device_name: 'jan-conf-web' }) });
         const data = await response.json();
         if (!response.ok) throw new Error(data.message ?? data.errors?.otp?.[0] ?? 'That code could not be verified.');
         window.localStorage.setItem('jan-conf-session', data.token);
@@ -102,13 +101,13 @@ export default function RegistrationModal() {
       }
 
       const token = window.localStorage.getItem('jan-conf-session');
-      const response = await fetch(`${API_URL}/auth/profile`, { method: 'PUT', headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: fullName, phone, role, church, state_country: stateCountry, attendance_mode: attendance, attendance_days: days, needs_accommodation: accommodation }) });
+      const response = await fetch(apiUrl('/auth/profile'), { method: 'PUT', headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: fullName, phone, role, church, state_country: stateCountry, attendance_mode: attendance, attendance_days: days, needs_accommodation: accommodation }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message ?? 'We could not save your registration.');
       router.push('/dashboard');
       close();
     } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : 'Something went wrong. Please try again.');
+      setError(submissionError instanceof TypeError ? 'We could not reach the registration server. Check that the backend is running locally or set NEXT_PUBLIC_API_URL to the public API URL before deploying.' : submissionError instanceof Error ? submissionError.message : 'Something went wrong. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -148,7 +147,7 @@ function OtpStep({ email, otp, setOtp }: { email: string; otp: string; setOtp: (
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/auth/start`, {
+      const response = await fetch(apiUrl('/auth/start'), {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, device_name: 'jan-conf-web' }),

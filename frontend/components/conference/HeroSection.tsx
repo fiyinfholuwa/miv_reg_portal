@@ -17,7 +17,7 @@ export default function HeroSection() {
 
   return (
     <section className="relative min-h-[790px] bg-ink text-white sm:min-h-[820px] lg:min-h-[760px]">
-      <div className="absolute inset-0 bg-cover bg-[68%_center]" style={{ backgroundImage: `linear-gradient(90deg, rgba(4,23,45,.98) 0%, rgba(4,23,45,.9) 32%, rgba(4,23,45,.52) 64%, rgba(4,23,45,.26) 100%), url(${images.church})` }} />
+      <div className="absolute inset-0 bg-cover bg-[68%_0%]" style={{ backgroundImage: `linear-gradient(90deg, rgba(4,23,45,.98) 0%, rgba(4,23,45,.9) 32%, rgba(4,23,45,.52) 64%, rgba(4,23,45,.26) 100%), url(${images.hero})` }} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_52%,rgba(207,68,55,.24),transparent_30%),linear-gradient(180deg,rgba(7,29,54,.16),#071d36f5_96%)]" />
       <ConferenceScene className="inset-x-0 top-[570px] h-[300px] w-full opacity-30 sm:top-[650px] sm:h-[350px] lg:left-auto lg:right-0 lg:top-1/2 lg:h-[520px] lg:w-[44%] lg:-translate-y-1/2 lg:opacity-60" />
 
@@ -30,6 +30,7 @@ export default function HeroSection() {
           <a className="transition hover:text-white" href="#schedule">Schedule</a>
           <a className="transition hover:text-white" href="#venue">Venue</a>
           <a className="transition hover:text-white" href="#media">Media</a>
+          <a className="transition hover:text-white" href="/shop">Shop</a>
           </nav>
           <div className="flex items-center gap-2">
             <button type="button" className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-white/10 text-xl transition hover:bg-white/20 lg:hidden" onClick={() => setIsMenuOpen((open) => !open)} aria-expanded={isMenuOpen} aria-controls="mobile-navigation" aria-label={isMenuOpen ? 'Close navigation' : 'Open navigation'}>{isMenuOpen ? '×' : '☰'}</button>
@@ -42,10 +43,11 @@ export default function HeroSection() {
           <a onClick={closeMenu} className="block rounded-xl px-4 py-3 text-sm font-semibold transition hover:bg-white/10" href="#schedule">Schedule</a>
           <a onClick={closeMenu} className="block rounded-xl px-4 py-3 text-sm font-semibold transition hover:bg-white/10" href="#venue">Venue</a>
           <a onClick={closeMenu} className="block rounded-xl px-4 py-3 text-sm font-semibold transition hover:bg-white/10" href="#media">Media</a>
+          <a onClick={closeMenu} className="block rounded-xl px-4 py-3 text-sm font-semibold transition hover:bg-white/10" href="/shop">Shop</a>
         </nav>}
       </header>
 
-      <div id="top" className="relative z-10 container-shell grid min-h-[685px] grid-cols-1 gap-10 pb-16 pt-20 sm:pt-24 lg:min-h-[650px] lg:grid-cols-[58%_42%] lg:items-center lg:gap-0 lg:pb-20 lg:pt-16">
+      <div id="top" className="relative z-10 scroll-mt-24 container-shell grid min-h-[685px] translate-y-8 grid-cols-1 gap-10 pb-16 pt-36 sm:translate-y-10 sm:pt-40 lg:min-h-[650px] lg:translate-y-12 lg:grid-cols-[58%_42%] lg:items-center lg:gap-0 lg:pb-20 lg:pt-36">
         <div className="max-w-3xl lg:max-w-[610px]">
           <p className="eyebrow mb-6 text-[#ff7565]">37th edition · ministers & leadership conference</p>
           <h1 className="display-title max-w-3xl text-[clamp(2.9rem,11vw,6rem)] sm:text-[clamp(3.8rem,8vw,6rem)] lg:max-w-[600px]"><span className="block">See you on</span><span className="block text-[#ffcf96]">19th — 24th</span><span className="block">Jan, 2027</span></h1>

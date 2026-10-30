@@ -2,8 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api';
+import { apiUrl } from '../../lib/api';
 
 type RegistrationUser = {
   email?: string;
@@ -42,7 +41,7 @@ export default function RegistrationLinkPage() {
 
     void (async () => {
       try {
-        const response = await fetch(`${API_URL}/auth/verify-link`, {
+        const response = await fetch(apiUrl('/auth/verify-link'), {
           method: 'POST',
           headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
           body: JSON.stringify({ token: verificationToken, device_name: 'jan-conf-web-link' }),
@@ -82,7 +81,7 @@ export default function RegistrationLinkPage() {
 
     try {
       const sessionToken = token || window.localStorage.getItem('jan-conf-session');
-      const response = await fetch(`${API_URL}/auth/profile`, {
+      const response = await fetch(apiUrl('/auth/profile'), {
         method: 'PUT',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
         body: JSON.stringify({ name: fullName, phone, role, church, state_country: stateCountry, attendance_mode: attendance, attendance_days: days, needs_accommodation: accommodation }),

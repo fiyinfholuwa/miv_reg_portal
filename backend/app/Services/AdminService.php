@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Broadcast;
+use App\Models\PartnerInquiry;
+use App\Models\ShopProduct;
 use App\Models\Testimonial;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -128,6 +130,52 @@ class AdminService
         $broadcast = Broadcast::create([...$attributes, 'created_by' => $admin->id]);
 
         return ['id' => $broadcast->id, 'message' => 'Broadcast saved.'];
+    }
+
+    public function shopProducts(User $admin): array
+    {
+        $this->ensureAdmin($admin);
+
+        return ShopProduct::query()->orderBy('sort_order')->latest('id')->get()->all();
+    }
+
+    public function createShopProduct(User $admin, array $attributes): array
+    {
+        $this->ensureAdmin($admin);
+        $product = ShopProduct::create($attributes);
+
+        return ['message' => 'Shop product created.', 'product' => $product];
+    }
+
+    public function updateShopProduct(User $admin, ShopProduct $product, array $attributes): array
+    {
+        $this->ensureAdmin($admin);
+        $product->update($attributes);
+
+        return ['message' => 'Shop product updated.', 'product' => $product->fresh()];
+    }
+
+    public function deleteShopProduct(User $admin, ShopProduct $product): array
+    {
+        $this->ensureAdmin($admin);
+        $product->delete();
+
+        return ['message' => 'Shop product deleted.'];
+    }
+
+    public function partnerInquiries(User $admin): array
+    {
+        $this->ensureAdmin($admin);
+
+        return PartnerInquiry::query()->latest()->limit(100)->get()->all();
+    }
+
+    public function reviewPartnerInquiry(User $admin, PartnerInquiry $inquiry, string $status): array
+    {
+        $this->ensureAdmin($admin);
+        $inquiry->update(['status' => $status]);
+
+        return ['message' => 'Partner enquiry updated.', 'inquiry' => $inquiry->fresh()];
     }
 
     public function ensureAdmin(User $user): void

@@ -1,15 +1,17 @@
-export const imageBase = 'https://images.unsplash.com/';
-
 export const images = {
-  hero: `${imageBase}photo-1519741497674-611481863552?auto=format&fit=crop&w=1800&q=85`,
+  hero: '/images/photos/lp-hero.webp',
   church: '/images/church-building.jpeg',
-  crowd: `${imageBase}photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=85`,
-  speaker: `${imageBase}photo-1475721027785-f74eccf877e2?auto=format&fit=crop&w=1000&q=85`,
-  worship: `${imageBase}photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1000&q=85`,
-  venue: `${imageBase}photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1400&q=85`,
-  audience: `${imageBase}photo-1511632765486-a01980e01a18?auto=format&fit=crop&w=1000&q=85`,
-  teaching: `${imageBase}photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=1000&q=85`,
+  crowd: '/images/photos/lp-hero-m.webp',
+  speaker: '/images/photos/lp-about-1.webp',
+  worship: '/images/photos/lp-about-2.webp',
+  venue: '/images/church-building.jpeg',
+  hotel: '/images/photos/lp-hotel.webp',
+  audience: '/images/publicity/flyer-preview.jpg',
+  teaching: '/images/photos/lp-about-1.webp',
   hosts: '/images/mummy-and-daddy.png',
+  samson: '/images/photos/lp-host-1.webp',
+  stella: '/images/photos/lp-host-2.webp',
+  registration: '/images/photos/lp-reg.webp',
 };
 
 export const schedule = {
@@ -46,33 +48,35 @@ export const media = [
 ];
 
 export const testimonials = [
-  ['The breakout on church planting gave our team a clear plan. We have started two outreach cells since the conference.', 'Rev. Daniel O.', 'Ilorin · IMLC 2026'],
-  ['I watched online from Accra. The stream held all week and the radio option saved my data.', 'Abena K.', 'Accra · Online delegate'],
-  ['My first IYLC. I made friends from five states and found my place in missions.', 'Tobi E.', 'Lagos · IYLC 2026'],
-  ['Registration and badge collection took less than ten minutes. Everything was in order.', 'Mrs. Ngozi U.', 'Enugu · Delegate'],
+  ['The breakout on church planting gave our team a clear plan. We have started two outreach cells since the conference.', 'Rev. Daniel O.', 'Ilorin · IMLC 2026', images.samson],
+  ['I watched online from Accra. The stream held all week and the radio option saved my data.', 'Abena K.', 'Accra · Online delegate', images.worship],
+  ['My first IYLC. I made friends from five states and found my place in missions.', 'Tobi E.', 'Lagos · IYLC 2026', images.speaker],
+  ['Registration and badge collection took less than ten minutes. Everything was in order.', 'Mrs. Ngozi U.', 'Enugu · Delegate', images.stella],
 ];
 
 export const ministers = [
-  { name: 'Rev. Samson Ajetomobi', role: 'Host · President, MIV', image: images.hosts, status: 'Confirmed' },
-  { name: 'Rev. Mrs Stella Ajetomobi', role: 'Host · Vice-President, MIV', image: images.hosts, status: 'Confirmed' },
-  { name: 'Guest minister', role: 'Speaker announcement coming soon', image: images.church, status: 'To be announced' },
-  { name: 'Guest minister', role: 'Speaker announcement coming soon', image: images.audience, status: 'To be announced' },
+  { name: 'Rev. Samson Ajetomobi', role: 'Host · President, MIV', image: images.samson, status: 'Confirmed' },
+  { name: 'Rev. Mrs Stella Ajetomobi', role: 'Host · Vice-President, MIV', image: images.stella, status: 'Confirmed' },
+  { name: 'Guest minister', role: 'Speaker announcement coming soon', image: '/images/miv-logo.png', status: 'To be announced' },
+  { name: 'Guest minister', role: 'Speaker announcement coming soon', image: '/images/miv-logo.png', status: 'To be announced' },
 ];
 
 export const merch = [
-  { name: 'Executive polo', price: '₦12,500', image: images.crowd, tag: 'Official merch' },
-  { name: 'Hoodie + cap set', price: '₦25,000', image: images.hero, tag: 'Limited set' },
-  { name: 'Conference T-shirt', price: '₦8,000', image: images.worship, tag: 'New' },
-  { name: 'Psalm 23 jersey', price: '₦15,000', image: images.audience, tag: 'Faith collection' },
+  { name: 'Revival hoodie', price: '₦20,000', image: '/images/merch/revival-hoodie.jpg', tag: 'Limited set' },
+  { name: 'Revival polo', price: '₦13,000', image: '/images/merch/revival-polo-navy.jpg', tag: 'Official merch' },
+  { name: 'Revival baseball shirt', price: '₦16,000', image: '/images/merch/revival-baseball.jpg', tag: 'Faith collection' },
+  { name: 'Revival T-shirt', price: '₦13,000', image: '/images/merch/revival-tee.jpg', tag: 'New' },
 ];
 
 export const gallery = [
   ['The room', images.crowd],
   ['The word', images.teaching],
   ['The worship', images.worship],
-  ['The gathering', images.audience],
-  ['The venue', images.church],
-  ['The next generation', images.hero],
+  ['The venue', images.hotel],
+  ['The conference', images.audience],
+  ['The gathering', images.hero],
+  ['Samson', images.samson],
+  ['Stella', images.stella],
 ];
 
 export const faqs = [

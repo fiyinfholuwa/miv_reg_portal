@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 export function Mark() {
-  return <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/25 bg-white/10 text-sm font-bold text-white">M</span>;
+  return <img src="/images/miv-logo.png" alt="MIV" className="h-9 w-9 shrink-0 rounded-full object-contain" />;
 }
 
 export function Arrow() {

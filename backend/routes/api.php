@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\ShopController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -32,7 +33,15 @@ Route::prefix('admin')->group(function (): void {
         Route::patch('/testimonials/{testimonial}/review', [AdminController::class, 'reviewTestimonial']);
         Route::get('/broadcasts', [AdminController::class, 'broadcasts']);
         Route::post('/broadcasts', [AdminController::class, 'createBroadcast']);
+        Route::get('/shop/products', [AdminController::class, 'shopProducts']);
+        Route::post('/shop/products', [AdminController::class, 'createShopProduct']);
+        Route::patch('/shop/products/{product}', [AdminController::class, 'updateShopProduct']);
+        Route::delete('/shop/products/{product}', [AdminController::class, 'deleteShopProduct']);
+        Route::get('/partner-inquiries', [AdminController::class, 'partnerInquiries']);
+        Route::patch('/partner-inquiries/{inquiry}/review', [AdminController::class, 'reviewPartnerInquiry']);
     });
 });
 
 Route::get('/user', [RegistrationController::class, 'user'])->middleware('auth:sanctum');
+Route::get('/shop/products', [ShopController::class, 'products']);
+Route::post('/partner-inquiries', [ShopController::class, 'partnerInquiry']);
