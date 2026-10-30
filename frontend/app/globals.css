@@ -16,21 +16,122 @@ body {
   background: #f6f2e9;
   color: #071d36;
   font-family: var(--font-inter), Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 ::selection { background: #cf4437; color: #fffaf0; }
 
 @layer components {
   .container-shell { @apply mx-auto w-[min(100%-2rem,1180px)]; }
-  .eyebrow { @apply text-[11px] font-bold uppercase tracking-[0.22em] text-coral; }
-  .display-title { @apply font-display text-[clamp(3.5rem,8vw,7.6rem)] font-bold uppercase leading-[0.82] tracking-[-0.04em]; }
-  .section-title { @apply font-display text-[clamp(3rem,7vw,6.2rem)] font-bold uppercase leading-[0.82] tracking-[-0.035em]; }
+  .eyebrow { @apply text-xs font-bold uppercase tracking-[0.18em] leading-5 text-coral; }
+  .type-body { @apply text-base leading-7; }
+  .type-body-muted { @apply text-sm leading-6; }
+  .type-meta { @apply text-xs leading-5; }
+  .form-label { @apply text-xs font-bold uppercase tracking-[0.12em] leading-5 text-ink/60; }
+  .form-control { @apply mt-2 w-full rounded-lg border-2 border-ink/15 bg-white px-4 py-3 text-base leading-6 outline-none focus:border-[#1469a9]; }
+  .form-control-dark { @apply mt-2 w-full rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-base leading-6 text-white outline-none placeholder:text-white/35 focus:border-[#ffcf96]; }
+  .page-title { @apply font-display text-5xl uppercase leading-[0.82] sm:text-6xl; }
+  .card-title { @apply font-display text-3xl uppercase leading-none; }
+  .display-title { @apply font-display text-[clamp(2.8rem,7vw,6.2rem)] font-bold uppercase leading-[0.86] tracking-[-0.04em]; }
+  .section-title { @apply font-display text-[clamp(2.5rem,6vw,5.2rem)] font-bold uppercase leading-[0.86] tracking-[-0.035em]; }
   .button-primary { @apply inline-flex items-center justify-center rounded-full bg-coral px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:-translate-y-0.5 hover:bg-[#b9382d] focus:outline-none focus:ring-4 focus:ring-coral/30; }
   .button-light { @apply inline-flex items-center justify-center rounded-full bg-cream px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] text-ink transition hover:-translate-y-0.5 hover:bg-white focus:outline-none focus:ring-4 focus:ring-white/30; }
   .card { @apply rounded-[1.6rem] border border-ink/10 bg-white shadow-soft; }
 }
 
+/* Keep the registration flow compact without clipping its longer steps. */
+[role='dialog'] > div {
+  max-width: 56rem;
+  min-height: min(720px, calc(100vh - 4rem));
+}
+
+[role='dialog'] > div > aside {
+  width: 220px;
+}
+
+[role='dialog'] h1 {
+  font-size: clamp(2.75rem, 5vw, 4.5rem);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+@media (max-width: 767px) {
+  [role='dialog'] > div {
+    flex-direction: column;
+  }
+
+  [role='dialog'] > div > aside {
+    display: flex !important;
+    width: 100%;
+    min-height: 0;
+    flex-direction: column;
+    padding: 1rem 1.25rem;
+  }
+
+  [role='dialog'] > div > aside > div:first-child,
+  [role='dialog'] > div > aside > p {
+    display: none;
+  }
+
+  [role='dialog'] > div > aside > div:nth-child(2) {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.35rem;
+    margin-top: 0;
+  }
+
+  [role='dialog'] > div > aside > div:nth-child(2) > div {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    text-align: center;
+  }
+
+  [role='dialog'] > div > aside > div:nth-child(2) > div > span.absolute {
+    display: none;
+  }
+
+  [role='dialog'] > div > aside > div:nth-child(2) > div > span:last-child {
+    min-width: 0;
+  }
+
+  [role='dialog'] > div > aside strong {
+    font-size: 0.625rem;
+    line-height: 1rem;
+    white-space: nowrap;
+  }
+
+  [role='dialog'] > div > aside small {
+    display: none;
+  }
+
+  [role='dialog'] > div > section > div:first-child > span:first-child {
+    display: none;
+  }
+
+  [role='dialog'] > div > section > div:first-child {
+    justify-content: flex-end;
+  }
+}
+
+[role='dialog']:has(.registration-email-step) > div > aside {
+  display: none !important;
+}
+
+[role='dialog']:has(.registration-email-step) > div > section > div:first-child > span:first-child {
+  display: none !important;
 }

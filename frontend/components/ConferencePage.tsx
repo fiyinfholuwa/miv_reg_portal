@@ -8,7 +8,6 @@ import {
 } from './conference/OverviewSections';
 import ScheduleSection from './conference/ScheduleSection';
 import {
-  AccreditationSection,
   FAQSection,
   GallerySection,
   MediaSection,
@@ -34,7 +33,6 @@ export default function ConferencePage() {
       <HostsSection />
       <MinistersSection />
       <ScheduleSection />
-      <AccreditationSection />
       <MediaSection />
       <TestimonialsSection />
       <VenueSection />

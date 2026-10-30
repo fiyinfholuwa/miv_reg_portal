@@ -134,11 +134,37 @@ export default function RegistrationModal() {
 }
 
 function EmailStep({ email, setEmail }: { email: string; setEmail: (value: string) => void }) {
-  return <div className="max-w-xl"><p className="text-base leading-7 text-ink/65">Start with your email. We’ll send a one-time code so your delegate pass stays secure.</p><label className="mt-8 block text-xs font-bold uppercase tracking-[0.12em] text-ink/60">Email address<input autoFocus required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-lg border-2 border-ink/15 bg-white px-4 py-4 text-base outline-none transition focus:border-[#1469a9]" placeholder="you@example.com" /></label><p className="mt-3 text-sm text-ink/50">No password needed. We’ll use this email to sign you in.</p></div>;
+  return <div className="registration-email-step max-w-xl"><p className="text-base leading-7 text-ink/65">Start with your email. We’ll send a one-time code so your delegate pass stays secure.</p><label className="mt-8 block text-xs font-bold uppercase tracking-[0.12em] text-ink/60">Email address<input autoFocus required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-lg border-2 border-ink/15 bg-white px-4 py-4 text-base outline-none transition focus:border-[#1469a9]" placeholder="you@example.com" /></label><p className="mt-3 text-sm text-ink/50">No password needed. We’ll use this email to sign you in.</p></div>;
 }
 
 function OtpStep({ email, otp, setOtp }: { email: string; otp: string; setOtp: (value: string) => void }) {
-  return <div className="max-w-xl"><p className="text-base leading-7 text-ink/65">Enter the 6-digit code we sent to <strong className="text-ink">{email}</strong>.</p><label className="mt-8 block text-xs font-bold uppercase tracking-[0.12em] text-ink/60">Verification code<input autoFocus required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, ''))} className="mt-2 w-full rounded-lg border-2 border-ink/15 bg-white px-4 py-4 text-2xl tracking-[0.45em] outline-none transition focus:border-[#1469a9]" placeholder="000000" /></label><button type="button" className="mt-4 text-sm font-bold text-[#1469a9]">Resend code</button></div>;
+  const [resending, setResending] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+
+  const resendCode = async () => {
+    setResending(true);
+    setNotice('');
+    setError('');
+
+    try {
+      const response = await fetch(`${API_URL}/auth/start`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, device_name: 'jan-conf-web' }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message ?? 'We could not resend the code.');
+      setOtp('');
+      setNotice('A new verification code was sent to your email.');
+    } catch (resendError) {
+      setError(resendError instanceof Error ? resendError.message : 'We could not resend the code.');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  return <div className="max-w-xl"><p className="text-base leading-7 text-ink/65">Enter the 6-digit code we sent to <strong className="text-ink">{email}</strong>.</p><label className="mt-8 block text-xs font-bold uppercase tracking-[0.12em] text-ink/60">Verification code<input autoFocus required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, ''))} className="mt-2 w-full rounded-lg border-2 border-ink/15 bg-white px-4 py-4 text-2xl tracking-[0.45em] outline-none transition focus:border-[#1469a9]" placeholder="000000" /></label><button type="button" onClick={() => void resendCode()} disabled={resending} className="mt-4 text-sm font-bold text-[#1469a9] disabled:cursor-wait disabled:opacity-60">{resending ? 'Sending…' : 'Resend code'}</button>{notice && <p className="mt-3 text-sm font-semibold text-[#34865e]" role="status">{notice}</p>}{error && <p className="mt-3 text-sm font-semibold text-coral" role="alert">{error}</p>}</div>;
 }
 
 function AboutStep({ fullName, setFullName, phone, setPhone, church, setChurch, stateCountry, setStateCountry, role, setRole }: { fullName: string; setFullName: (value: string) => void; phone: string; setPhone: (value: string) => void; church: string; setChurch: (value: string) => void; stateCountry: string; setStateCountry: (value: string) => void; role: string; setRole: (value: string) => void }) {

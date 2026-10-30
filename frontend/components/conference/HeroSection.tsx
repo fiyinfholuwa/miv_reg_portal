@@ -33,7 +33,7 @@ export default function HeroSection() {
           </nav>
           <div className="flex items-center gap-2">
             <button type="button" className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-white/10 text-xl transition hover:bg-white/20 lg:hidden" onClick={() => setIsMenuOpen((open) => !open)} aria-expanded={isMenuOpen} aria-controls="mobile-navigation" aria-label={isMenuOpen ? 'Close navigation' : 'Open navigation'}>{isMenuOpen ? '×' : '☰'}</button>
-            <a className="button-primary px-4 py-3 text-[11px] sm:px-6 sm:text-sm" href="#register">Register free <Arrow /></a>
+            <a className="button-primary px-4 py-3 sm:px-6" href="#register">Register free <Arrow /></a>
           </div>
         </div>
         {isMenuOpen && <nav id="mobile-navigation" className="absolute left-4 right-4 top-full mt-3 rounded-2xl border border-white/10 bg-ink p-3 shadow-2xl lg:hidden" aria-label="Mobile navigation">
@@ -48,7 +48,7 @@ export default function HeroSection() {
       <div id="top" className="relative z-10 container-shell grid min-h-[685px] grid-cols-1 gap-10 pb-16 pt-20 sm:pt-24 lg:min-h-[650px] lg:grid-cols-[58%_42%] lg:items-center lg:gap-0 lg:pb-20 lg:pt-16">
         <div className="max-w-3xl lg:max-w-[610px]">
           <p className="eyebrow mb-6 text-[#ff7565]">37th edition · ministers & leadership conference</p>
-          <h1 className="display-title max-w-3xl text-[clamp(3.5rem,13vw,6.8rem)] sm:text-[clamp(4.5rem,9vw,6.8rem)] lg:max-w-[600px]"><span className="block">See you on</span><span className="block text-[#ffcf96]">19th — 24th</span><span className="block">Jan, 2027</span></h1>
+          <h1 className="display-title max-w-3xl text-[clamp(2.9rem,11vw,6rem)] sm:text-[clamp(3.8rem,8vw,6rem)] lg:max-w-[600px]"><span className="block">See you on</span><span className="block text-[#ffcf96]">19th — 24th</span><span className="block">Jan, 2027</span></h1>
           <p className="mt-7 max-w-xl text-base leading-7 text-sky/85 sm:text-lg sm:leading-8">A six-day gathering for ministry, leadership, and the next generation. Come ready to be strengthened, equipped, and sent.</p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row"><a className="button-light w-full sm:w-auto" href="#register">Register now <Arrow /></a><a className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/25 px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:bg-white/10 sm:w-auto" href="#schedule">View schedule <span>↓</span></a></div>
           <p className="mt-6 max-w-md text-sm font-medium leading-6 text-white/60">Leadership & Missions Conference Centre · Olororo, Ojoo, Ibadan</p>
