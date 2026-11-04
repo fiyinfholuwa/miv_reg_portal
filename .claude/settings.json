@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n 'foreach \\($products' -B2 -A4 database/seeders/DatabaseSeeder.php)",
+      "Bash(bash -c ' *)",
+      "Bash(grep -v '^\\\\s*//\\\\|^\\\\s*\\\\*\\\\|^$')"
+    ]
+  }
+}

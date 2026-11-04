@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FeedbackRequest;
 use App\Http\Requests\TestimonialRequest;
+use App\Models\Event;
 use App\Services\DashboardService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,9 +14,11 @@ class DashboardController extends Controller
 {
     public function __construct(private readonly DashboardService $dashboardService) {}
 
-    public function testimonials(): JsonResponse
+    public function testimonials(Request $request): JsonResponse
     {
-        return response()->json(['testimonials' => $this->dashboardService->testimonials()]);
+        $event = $request->filled('event') ? Event::where('slug', $request->string('event')->toString())->first() : null;
+
+        return response()->json(['testimonials' => $this->dashboardService->testimonials($event)]);
     }
 
     public function submitTestimonial(TestimonialRequest $request): JsonResponse

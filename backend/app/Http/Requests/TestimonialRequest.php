@@ -18,6 +18,7 @@ class TestimonialRequest extends FormRequest
             'content' => ['required', 'string', 'min:10', 'max:6000'],
             'topic' => ['nullable', 'string', 'max:80'],
             'show_name' => ['sometimes', 'boolean'],
+            'event' => ['nullable', 'string', 'exists:events,slug'],
         ];
     }
 }

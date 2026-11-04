@@ -2,8 +2,10 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use App\Models\Event;
 use App\Models\ShopProduct;
+use App\Models\User;
+use App\Services\EventCatalog;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -45,6 +47,10 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Revival baseball shirt', 'description' => 'A relaxed baseball shirt from the faith collection, designed for easy everyday wear.', 'price' => 16000, 'image' => '/images/merch/revival-baseball.jpg', 'tag' => 'Faith collection', 'sort_order' => 3],
             ['name' => 'Revival T-shirt', 'description' => 'A simple, comfortable Revival T-shirt you can wear long after the conference ends.', 'price' => 13000, 'image' => '/images/merch/revival-tee.jpg', 'tag' => 'New', 'sort_order' => 4],
         ];
+
+        foreach (EventCatalog::rows() as $event) {
+            Event::updateOrCreate(['slug' => $event['slug']], $event);
+        }
 
         foreach ($products as $product) {
             ShopProduct::updateOrCreate(['name' => $product['name']], [...$product, 'active' => true]);

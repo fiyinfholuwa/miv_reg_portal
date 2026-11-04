@@ -94,12 +94,13 @@ class AdminService
     {
         $this->ensureAdmin($admin);
 
-        return Testimonial::with('user:id,name,email')->latest()->limit(100)->get()->map(fn (Testimonial $item): array => [
+        return Testimonial::with(['user:id,name,email', 'event:id,short_name'])->latest()->limit(100)->get()->map(fn (Testimonial $item): array => [
             'id' => $item->id,
             'name' => $item->show_name ? ($item->user?->name ?: 'A delegate') : 'A delegate',
             'email' => $item->user?->email,
             'content' => $item->content,
             'topic' => $item->topic,
+            'event' => $item->event?->short_name,
             'status' => $item->status,
             'created_at' => $item->created_at?->toIso8601String(),
         ])->all();

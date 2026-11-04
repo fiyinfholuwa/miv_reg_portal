@@ -16,11 +16,12 @@ class CompleteRegistrationRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:40'],
-            'role' => ['required', 'in:Delegate,International delegate,Minister'],
+            'role' => ['required', 'in:Delegate,International delegate,Minister,Leader,Guest'],
             'church' => ['nullable', 'string', 'max:255'],
             'state_country' => ['nullable', 'string', 'max:255'],
-            'attendance_mode' => ['required', 'in:Onsite in Ibadan,Online'],
-            'attendance_days' => ['required', 'array', 'min:1'],
+            // Legacy Jan Conf form only: when sent, the user is also registered for IMLC.
+            'attendance_mode' => ['sometimes', 'in:Onsite in Ibadan,Online'],
+            'attendance_days' => ['required_with:attendance_mode', 'array', 'min:1'],
             'attendance_days.*' => ['string', 'in:Tue 19,Wed 20,Thu 21,Fri 22,Sat 23,Sun 24'],
             'needs_accommodation' => ['sometimes', 'boolean'],
         ];

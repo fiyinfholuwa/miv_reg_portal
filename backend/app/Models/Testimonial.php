@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'type', 'content', 'topic', 'show_name', 'status', 'likes', 'published_at'])]
+#[Fillable(['user_id', 'event_id', 'type', 'content', 'topic', 'show_name', 'status', 'likes', 'published_at'])]
 class Testimonial extends Model
 {
     protected function casts(): array
@@ -15,6 +15,11 @@ class Testimonial extends Model
             'show_name' => 'boolean',
             'published_at' => 'datetime',
         ];
+    }
+
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(Event::class);
     }
 
     public function user(): BelongsTo

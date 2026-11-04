@@ -25,7 +25,7 @@ import RegistrationModal from './conference/RegistrationModal';
 export default function ConferencePage() {
   return (
     <main className="overflow-hidden">
-      <RegistrationModal />
+      <RegistrationModal defaultEvent="imlc" />
       <HeroSection />
       <StatsSection />
       <AboutSection />

@@ -1,5 +1,5 @@
-import ConferencePage from '../components/ConferencePage';
+import HubLanding from '../components/landing/HubLanding';
 
 export default function Page() {
-  return <ConferencePage />;
+  return <HubLanding />;
 }

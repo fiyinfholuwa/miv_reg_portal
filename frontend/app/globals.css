@@ -47,91 +47,23 @@ textarea {
   .card { @apply rounded-[1.6rem] border border-ink/10 bg-white shadow-soft; }
 }
 
-/* Keep the registration flow compact without clipping its longer steps. */
-[role='dialog'] > div {
-  max-width: 52rem;
-  min-height: min(640px, calc(100vh - 4rem));
-}
-
-[role='dialog'] > div > aside {
-  width: 210px;
-}
-
-[role='dialog'] h1 {
-  font-size: clamp(2.75rem, 5vw, 4.5rem);
-}
-
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
-@media (max-width: 767px) {
-  [role='dialog'] > div {
-    flex-direction: column;
-  }
-
-  [role='dialog'] > div > aside {
-    display: flex !important;
-    width: 100%;
-    min-height: 0;
-    flex-direction: column;
-    padding: 1rem 1.25rem;
-  }
-
-  [role='dialog'] > div > aside > div:first-child,
-  [role='dialog'] > div > aside > p {
-    display: none;
-  }
-
-  [role='dialog'] > div > aside > div:nth-child(2) {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.35rem;
-    margin-top: 0;
-  }
-
-  [role='dialog'] > div > aside > div:nth-child(2) > div {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    text-align: center;
-  }
-
-  [role='dialog'] > div > aside > div:nth-child(2) > div > span.absolute {
-    display: none;
-  }
-
-  [role='dialog'] > div > aside > div:nth-child(2) > div > span:last-child {
-    min-width: 0;
-  }
-
-  [role='dialog'] > div > aside strong {
-    font-size: 0.625rem;
-    line-height: 1rem;
-    white-space: nowrap;
-  }
-
-  [role='dialog'] > div > aside small {
-    display: none;
-  }
-
-  [role='dialog'] > div > section > div:first-child > span:first-child {
-    display: none;
-  }
-
-  [role='dialog'] > div > section > div:first-child {
-    justify-content: flex-end;
-  }
+/* MIV Conferences hub (landing, /events). Barlow everywhere, scoped so the
+   conference microsite, shop and dashboards keep their own type. */
+.miv-hub {
+  min-height: 100vh;
+  background: #faf6ec;
+  color: #0c0d10;
+  font-family: 'Barlow', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  overflow-x: clip;
 }
-
-[role='dialog']:has(.registration-email-step) > div > aside {
-  display: none !important;
-}
-
-[role='dialog']:has(.registration-email-step) > div > section > div:first-child > span:first-child {
-  display: none !important;
+.miv-hub h1, .miv-hub h2, .miv-hub h3 { font-family: inherit; }
+.miv-hub a:focus-visible, .miv-hub button:focus-visible, .miv-hub select:focus-visible {
+  outline: 3px solid rgba(29, 114, 186, .55);
+  outline-offset: 2px;
 }
