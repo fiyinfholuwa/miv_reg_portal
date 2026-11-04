@@ -5,6 +5,12 @@ return [
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
     'registration_otp_expiry' => (int) env('REGISTRATION_OTP_EXPIRY', 10),
     'registration_token_years' => (int) env('REGISTRATION_TOKEN_YEARS', 5),
+    'elasticemail' => [
+        'api_key' => env('ELASTICEMAIL_API_KEY'),
+        'from_address' => env('ELASTICEMAIL_FROM_ADDRESS', 'conference@menofissacharvision.com'),
+        'from_name' => env('ELASTICEMAIL_FROM_NAME', 'Men of Issachar Vision'),
+        'timeout' => (int) env('ELASTICEMAIL_TIMEOUT', 15),
+    ],
     'paystack' => [
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
         'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),

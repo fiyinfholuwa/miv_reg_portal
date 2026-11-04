@@ -89,6 +89,7 @@ class ShopOrderService
         }
 
         $order->update(['status' => 'paid', 'paid_at' => now(), 'pickup_code' => $order->pickup_code ?: $this->newPickupCode(), 'payment_data' => ['verify' => $payment]]);
+        $user->shopCartItems()->delete();
         return $this->payload($order->fresh('items'));
     }
 

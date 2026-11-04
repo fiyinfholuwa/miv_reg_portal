@@ -4,16 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PartnerInquiryRequest;
+use App\Http\Requests\ShopCartRequest;
 use App\Http\Requests\ShopOrderRequest;
 use App\Models\PartnerInquiry;
 use App\Models\ShopProduct;
 use App\Services\ShopOrderService;
+use App\Services\ShopCartService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ShopController extends Controller
 {
-    public function __construct(private readonly ShopOrderService $orderService) {}
+    public function __construct(
+        private readonly ShopOrderService $orderService,
+        private readonly ShopCartService $cartService,
+    ) {}
 
     public function products(): JsonResponse
     {
@@ -39,6 +44,21 @@ class ShopController extends Controller
     public function initializeOrder(ShopOrderRequest $request): JsonResponse
     {
         return response()->json($this->orderService->initialize($request->user(), $request->validated('items')));
+    }
+
+    public function cart(Request $request): JsonResponse
+    {
+        return response()->json($this->cartService->payload($request->user()));
+    }
+
+    public function updateCart(ShopCartRequest $request): JsonResponse
+    {
+        return response()->json($this->cartService->replace($request->user(), $request->validated('items')));
+    }
+
+    public function clearCart(Request $request): JsonResponse
+    {
+        return response()->json($this->cartService->clear($request->user()));
     }
 
     public function verifyOrder(Request $request, string $reference): JsonResponse

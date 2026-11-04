@@ -6,12 +6,13 @@ use App\Mail\RegistrationOtpMail;
 use App\Models\RegistrationOtp;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class RegistrationService
 {
+    public function __construct(private readonly EmailService $emailService) {}
+
     public function start(string $email, ?string $deviceName = null): array
     {
         $email = Str::lower(trim($email));
@@ -36,7 +37,7 @@ class RegistrationService
         $linkToken = Str::random(64);
         $expiresAt = now()->addMinutes((int) config('services.registration_otp_expiry', 10));
 
-        RegistrationOtp::create([
+        $registrationOtp = RegistrationOtp::create([
             'user_id' => $user->id,
             'email' => $email,
             'code_hash' => Hash::make($otp),
@@ -44,11 +45,11 @@ class RegistrationService
             'expires_at' => $expiresAt,
         ]);
 
-        Mail::to($email)->send(new RegistrationOtpMail(
+        $this->emailService->sendMailable(new RegistrationOtpMail(
             otp: $otp,
-            verificationUrl: rtrim((string) config('services.frontend_url'), '/') . '/register/verify?token=' . $linkToken,
+            verificationUrl: rtrim((string) config('services.frontend_url'), '/').'/register/verify?token='.$linkToken,
             expiresAt: $expiresAt,
-        ));
+        ), $email, 'registration-otp-'.$user->id.'-'.$registrationOtp->id);
 
         return [
             'status' => 'otp_required',
@@ -160,7 +161,7 @@ class RegistrationService
     private function newTicketCode(): string
     {
         do {
-            $code = 'JC27-DLG-' . random_int(10000, 99999);
+            $code = 'JC27-DLG-'.random_int(10000, 99999);
         } while (User::where('ticket_code', $code)->exists());
 
         return $code;

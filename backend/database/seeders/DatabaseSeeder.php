@@ -40,10 +40,10 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $products = [
-            ['name' => 'Revival hoodie', 'price' => 20000, 'image' => '/images/merch/revival-hoodie.jpg', 'tag' => 'Limited set', 'sort_order' => 1],
-            ['name' => 'Revival polo', 'price' => 13000, 'image' => '/images/merch/revival-polo-navy.jpg', 'tag' => 'Official merch', 'sort_order' => 2],
-            ['name' => 'Revival baseball shirt', 'price' => 16000, 'image' => '/images/merch/revival-baseball.jpg', 'tag' => 'Faith collection', 'sort_order' => 3],
-            ['name' => 'Revival T-shirt', 'price' => 13000, 'image' => '/images/merch/revival-tee.jpg', 'tag' => 'New', 'sort_order' => 4],
+            ['name' => 'Revival hoodie', 'description' => 'A warm, everyday hoodie made for conference days, travel, and the season beyond.', 'price' => 20000, 'image' => '/images/merch/revival-hoodie.jpg', 'tag' => 'Limited set', 'sort_order' => 1],
+            ['name' => 'Revival polo', 'description' => 'A clean, comfortable polo with the Revival mark for a polished conference look.', 'price' => 13000, 'image' => '/images/merch/revival-polo-navy.jpg', 'tag' => 'Official merch', 'sort_order' => 2],
+            ['name' => 'Revival baseball shirt', 'description' => 'A relaxed baseball shirt from the faith collection, designed for easy everyday wear.', 'price' => 16000, 'image' => '/images/merch/revival-baseball.jpg', 'tag' => 'Faith collection', 'sort_order' => 3],
+            ['name' => 'Revival T-shirt', 'description' => 'A simple, comfortable Revival T-shirt you can wear long after the conference ends.', 'price' => 13000, 'image' => '/images/merch/revival-tee.jpg', 'tag' => 'New', 'sort_order' => 4],
         ];
 
         foreach ($products as $product) {

@@ -49,12 +49,12 @@ textarea {
 
 /* Keep the registration flow compact without clipping its longer steps. */
 [role='dialog'] > div {
-  max-width: 56rem;
-  min-height: min(720px, calc(100vh - 4rem));
+  max-width: 52rem;
+  min-height: min(640px, calc(100vh - 4rem));
 }
 
 [role='dialog'] > div > aside {
-  width: 220px;
+  width: 210px;
 }
 
 [role='dialog'] h1 {

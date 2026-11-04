@@ -88,7 +88,7 @@ export default function RegistrationLinkPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message ?? 'We could not save your registration.');
-      router.replace('/dashboard');
+      router.replace('/dashboard?welcome=attending');
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : 'Something went wrong. Please try again.');
     } finally {

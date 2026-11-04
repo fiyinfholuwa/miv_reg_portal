@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Mail\BroadcastMail;
 use App\Models\Broadcast;
 use App\Models\PartnerInquiry;
 use App\Models\ShopProduct;
@@ -13,6 +14,8 @@ use Illuminate\Support\Str;
 
 class AdminService
 {
+    public function __construct(private readonly EmailService $emailService) {}
+
     public function login(string $email, string $password, ?string $deviceName = null): array
     {
         $user = User::where('email', Str::lower(trim($email)))->where('is_admin', true)->first();
@@ -62,7 +65,9 @@ class AdminService
     {
         $this->ensureAdmin($admin);
         $query = User::query()->where('is_admin', false)->latest();
-        if ($status) $query->where('approval_status', $status);
+        if ($status) {
+            $query->where('approval_status', $status);
+        }
 
         return $query->limit(100)->get()->map(fn (User $user): array => [
             'id' => $user->id,
@@ -127,9 +132,49 @@ class AdminService
     public function createBroadcast(User $admin, array $attributes): array
     {
         $this->ensureAdmin($admin);
-        $broadcast = Broadcast::create([...$attributes, 'created_by' => $admin->id]);
+        $shouldSend = ($attributes['status'] ?? 'draft') === 'sent';
+        $broadcast = Broadcast::create([
+            ...$attributes,
+            'status' => $shouldSend ? 'sending' : ($attributes['status'] ?? 'draft'),
+            'created_by' => $admin->id,
+        ]);
 
-        return ['id' => $broadcast->id, 'message' => 'Broadcast saved.'];
+        $recipients = 0;
+
+        if ($shouldSend) {
+            try {
+                $emails = User::query()
+                    ->where('is_admin', false)
+                    ->whereNotNull('email_verified_at')
+                    ->whereNotNull('registration_completed_at')
+                    ->pluck('email')
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                foreach ($emails as $email) {
+                    $this->emailService->sendMailable(
+                        new BroadcastMail($broadcast->title, $broadcast->body),
+                        $email,
+                        'broadcast-'.$broadcast->id.'-'.sha1($email),
+                    );
+                    $recipients++;
+                }
+
+                $broadcast->update(['status' => 'sent']);
+            } catch (\Throwable $exception) {
+                $broadcast->update(['status' => 'failed']);
+
+                throw $exception;
+            }
+        }
+
+        return [
+            'id' => $broadcast->id,
+            'message' => 'Broadcast saved.',
+            'status' => $broadcast->status,
+            'recipients' => $recipients,
+        ];
     }
 
     public function shopProducts(User $admin): array

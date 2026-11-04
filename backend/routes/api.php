@@ -47,6 +47,9 @@ Route::get('/user', [RegistrationController::class, 'user'])->middleware('auth:s
 Route::get('/shop/products', [ShopController::class, 'products']);
 Route::post('/partner-inquiries', [ShopController::class, 'partnerInquiry']);
 Route::middleware('auth:sanctum')->prefix('shop')->group(function (): void {
+    Route::get('/cart', [ShopController::class, 'cart']);
+    Route::put('/cart', [ShopController::class, 'updateCart']);
+    Route::delete('/cart', [ShopController::class, 'clearCart']);
     Route::post('/orders/initialize', [ShopController::class, 'initializeOrder']);
     Route::get('/orders/{reference}/verify', [ShopController::class, 'verifyOrder']);
     Route::get('/orders', [ShopController::class, 'orders']);

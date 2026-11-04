@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Mail\BroadcastMail;
 use App\Mail\RegistrationOtpMail;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class RegistrationApiTest extends TestCase
@@ -63,7 +65,7 @@ class RegistrationApiTest extends TestCase
     {
         Mail::fake();
 
-        $user = \App\Models\User::factory()->create([
+        $user = User::factory()->create([
             'email' => 'verified@example.com',
             'email_verified_at' => now(),
         ]);
@@ -101,7 +103,7 @@ class RegistrationApiTest extends TestCase
 
     public function test_authenticated_user_can_submit_testimony_and_feedback(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $token = $user->createToken('test')->plainTextToken;
 
         $this->withToken($token)->postJson('/api/auth/testimonials', [
@@ -121,7 +123,7 @@ class RegistrationApiTest extends TestCase
 
     public function test_admin_can_login_review_and_create_broadcast(): void
     {
-        $admin = \App\Models\User::factory()->create([
+        $admin = User::factory()->create([
             'email' => 'admin@test.local',
             'password' => Hash::make('secret-password'),
             'is_admin' => true,
@@ -141,5 +143,35 @@ class RegistrationApiTest extends TestCase
             'body' => 'Gate B opens at 1:15 PM.',
             'status' => 'sent',
         ])->assertCreated()->assertJsonPath('message', 'Broadcast saved.');
+    }
+
+    public function test_send_now_broadcast_delivers_to_completed_verified_delegates(): void
+    {
+        Mail::fake();
+
+        $admin = User::factory()->create([
+            'email' => 'admin-send@test.local',
+            'password' => Hash::make('secret-password'),
+            'is_admin' => true,
+        ]);
+        User::factory()->create([
+            'email' => 'delegate@test.local',
+            'registration_completed_at' => now(),
+            'is_admin' => false,
+        ]);
+
+        $token = $admin->createToken('test-admin', ['admin'])->plainTextToken;
+
+        $this->withToken($token)->postJson('/api/admin/broadcasts', [
+            'title' => 'Venue update',
+            'body' => 'The welcome desk opens at 1:00 PM.',
+            'status' => 'sent',
+        ])->assertCreated()
+            ->assertJsonPath('status', 'sent')
+            ->assertJsonPath('recipients', 1);
+
+        $this->assertDatabaseHas('broadcasts', ['title' => 'Venue update', 'status' => 'sent']);
+        Mail::assertSent(BroadcastMail::class, fn (BroadcastMail $mail): bool => $mail->title === 'Venue update');
+        $this->assertStringContainsString('MEN OF ISSACHAR VISION', (new BroadcastMail('Venue update', 'Body'))->render());
     }
 }

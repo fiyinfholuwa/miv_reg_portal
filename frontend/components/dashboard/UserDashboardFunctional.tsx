@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { API_URL } from '../../lib/api';
+import { usePathname, useRouter } from 'next/navigation';
 
 type Page = 'Home' | 'Programme' | 'My pass' | 'Live' | 'Testimonials' | 'Attending card' | 'My team' | 'Publicity kit' | 'Store' | 'Order history' | 'Hotels & travel';
 type Profile = { id: number; name: string; email: string; phone: string | null; role: string | null; church: string | null; state_country: string | null; attendance_mode: string | null; attendance_days: string[] | null; needs_accommodation: boolean; ticket_code: string | null; approval_status: string };
@@ -12,6 +13,23 @@ const navigation: { label: Page; icon: string }[] = [
   { label: 'Home', icon: '⌂' }, { label: 'Programme', icon: '▤' }, { label: 'My pass', icon: '▣' }, { label: 'Live', icon: '▶' }, { label: 'Testimonials', icon: '♡' },
   { label: 'Attending card', icon: 'A' }, { label: 'My team', icon: '♧' }, { label: 'Publicity kit', icon: '▣' }, { label: 'Store', icon: '$' }, { label: 'Order history', icon: '▤' }, { label: 'Hotels & travel', icon: 'H' },
 ];
+const pageSlugs: Record<Page, string> = {
+  Home: '',
+  Programme: 'programme',
+  'My pass': 'pass',
+  Live: 'live',
+  Testimonials: 'testimonials',
+  'Attending card': 'attending-card',
+  'My team': 'team',
+  'Publicity kit': 'publicity-kit',
+  Store: 'store',
+  'Order history': 'order-history',
+  'Hotels & travel': 'hotels-travel',
+};
+const pageBySlug = Object.entries(pageSlugs).reduce<Record<string, Page>>((pages, [page, slug]) => {
+  pages[slug] = page as Page;
+  return pages;
+}, {});
 const programme = [
   ['7:00', 'AM', 'Arrival & check-in', 'Gates A and B'], ['9:00', 'AM', 'Royal Conference', 'Main hall · until 1 PM'], ['1:00', 'PM', 'Lunch', 'Meal points 1–3'], ['2:00', 'PM', 'IYLC', 'Main hall · ages 16–45 · until 8 PM'],
 ];
@@ -26,7 +44,9 @@ async function api(path: string, options: RequestInit = {}) {
 }
 
 export default function UserDashboardFunctional() {
-  const [active, setActive] = useState<Page>('Home');
+  const pathname = usePathname();
+  const router = useRouter();
+  const active = pageBySlug[pathname.split('/')[2] || ''] || 'Home';
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [online, setOnline] = useState(false);
@@ -46,6 +66,12 @@ export default function UserDashboardFunctional() {
     void loadProfile().catch(() => { window.localStorage.removeItem('jan-conf-session'); window.location.assign('/'); }).finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('welcome') === 'attending') {
+      router.replace('/dashboard/attending-card');
+    }
+  }, [router]);
+
   const logout = async () => {
     await api('/auth/logout').catch(() => undefined);
     window.localStorage.removeItem('jan-conf-session');
@@ -53,7 +79,10 @@ export default function UserDashboardFunctional() {
   };
 
   if (loading || !profile) return <main className="grid min-h-screen place-items-center bg-[#f6f2e9] text-sm font-bold text-[#0b4779]">Loading your dashboard…</main>;
-  const select = (page: Page) => { setActive(page); setMobileOpen(false); };
+  const select = (page: Page) => {
+    router.push(pageSlugs[page] ? `/dashboard/${pageSlugs[page]}` : '/dashboard');
+    setMobileOpen(false);
+  };
   const initials = profile.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
   return <main className="min-h-screen bg-[#f6f2e9] text-ink"><div className="flex min-h-screen"><aside className="hidden w-[285px] shrink-0 border-r border-ink/10 bg-white p-5 lg:flex lg:flex-col"><Logo /><Nav active={active} select={select} /><div className="mt-auto rounded-2xl bg-[#f5ecd9] p-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#e2edf6] font-bold text-[#1469a9]">{initials}</span><div><strong className="block text-sm">{profile.name}</strong><span className="text-xs text-ink/50">{profile.role || 'Delegate'} · {profile.attendance_mode || 'Online'}</span></div></div><button type="button" onClick={logout} className="mt-4 w-full border-t border-ink/10 pt-3 text-left text-sm font-bold text-ink/60">↪ Log out</button></div></aside><div className="min-w-0 flex-1"><header className="flex items-center justify-between border-b border-ink/10 bg-white px-5 py-4 lg:hidden"><Logo /><button type="button" onClick={() => setMobileOpen((open) => !open)} className="grid h-11 w-11 place-items-center rounded-xl bg-ink text-xl text-white">{mobileOpen ? '×' : '☰'}</button></header>{mobileOpen && <div className="border-b border-ink/10 bg-white p-4 lg:hidden"><Nav active={active} select={select} /><button type="button" onClick={logout} className="mt-3 w-full border-t border-ink/10 pt-4 text-left text-sm font-bold text-ink/60">↪ Log out</button></div>}<div className="border-b border-ink/10 bg-[#e8edf3] px-5 py-2 text-xs font-medium text-ink/50 sm:px-10">Delegate portal · Jan. Conf 2027</div><section className="p-4 sm:p-7 lg:p-10"><div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-base text-ink/50">Good evening</p><h1 className="page-title mt-1">{active === 'Home' ? profile.name.split(' ')[0] : active}</h1></div>{active === 'Home' && <button type="button" onClick={() => setOnline((value) => !value)} className="rounded-md border-2 border-ink/15 bg-white px-4 py-2 text-xs font-bold uppercase text-[#0b4779]">{online ? 'Switch to onsite' : 'Switch to online'}</button>}</div>{active === 'Home' && <Home profile={profile} online={online} select={select} />}{active === 'Programme' && <Programme />}{active === 'My pass' && <Pass profile={profile} />}{active === 'Live' && <Live />}{active === 'Testimonials' && <Testimonials />}{active === 'Attending card' && <Attending profile={profile} onSaved={setProfile} />}{active === 'My team' && <Team profile={profile} />}{active === 'Publicity kit' && <Publicity />}{active === 'Store' && <Store />}{active === 'Order history' && <OrderHistory />}{active === 'Hotels & travel' && <Hotels />}</section></div></div></main>;
 }
@@ -84,7 +113,47 @@ function Attending({ profile, onSaved }: { profile: Profile; onSaved: (profile: 
     event.preventDefault(); setSaving(true); setMessage('');
     try { const data = await api('/auth/profile', { method: 'PUT', body: JSON.stringify({ name, phone: profile.phone || '', role: profile.role || 'Delegate', church, state_country: profile.state_country || '', attendance_mode: profile.attendance_mode || 'Online', attendance_days: profile.attendance_days?.length ? profile.attendance_days : ['Tue 19'], needs_accommodation: profile.needs_accommodation }) }); onSaved(data.user); setMessage('Your profile was saved.'); } catch (saveError) { setMessage(saveError instanceof Error ? saveError.message : 'Could not save.'); } finally { setSaving(false); }
   };
-  return <div className="grid gap-8 2xl:grid-cols-[minmax(0,600px)_minmax(0,1fr)]"><div className="flex min-h-[620px] items-center justify-center rounded-[1.75rem] bg-[#fbf7ee] p-5 shadow-sm sm:p-10"><div className="relative aspect-[.72] w-full max-w-[510px] overflow-hidden rounded-[1.5rem] border-l-[10px] border-[#b52e28] bg-[#f6f2e9] p-8 shadow-[0_18px_40px_rgba(7,29,54,.14)]"><p className="font-display text-lg uppercase text-[#0b2c4a]">37th IMLC<br />& IYLC 2027</p><div className="absolute right-8 top-28 grid h-40 w-32 place-items-center rounded-2xl border-8 border-white bg-[#dbe9f8] text-xs font-bold text-[#1469a9]">YOUR PHOTO</div><div className="absolute bottom-12 left-8 right-8"><p className="font-display text-[clamp(3rem,8vw,5.8rem)] uppercase leading-[.78] text-[#03284a]">I will be<br />attending</p><p className="mt-5 text-xl font-bold">{name || 'Your name'}</p><p className="mt-2 text-xs font-bold uppercase tracking-[.1em] text-[#b52e28]">19–24 Jan 2027 · Ibadan</p></div></div></div><form onSubmit={save}><p className="eyebrow text-[#b52e28]">Share the invite</p><h2 className="mt-4 font-display text-5xl uppercase leading-[.85] text-[#03284a] sm:text-7xl">Your attending card</h2><label className="mt-8 block text-xs font-bold uppercase tracking-[.12em] text-ink/60">Name on card<input required value={name} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-lg border-2 border-ink/15 bg-white px-4 py-4 text-base outline-none focus:border-[#1469a9]" /></label><label className="mt-6 block text-xs font-bold uppercase tracking-[.12em] text-ink/60">Church / ministry<input value={church} onChange={(event) => setChurch(event.target.value)} className="mt-2 w-full rounded-lg border-2 border-ink/15 bg-white px-4 py-4 text-base outline-none focus:border-[#1469a9]" /></label>{message && <p className="mt-5 text-sm font-bold text-[#34865e]">{message}</p>}<div className="mt-8 flex flex-wrap gap-3"><button disabled={saving} className="rounded-md bg-[#1469a9] px-7 py-4 text-sm font-bold uppercase text-white">{saving ? 'Saving…' : 'Save card'}</button><button type="button" onClick={() => navigator.clipboard?.writeText(window.location.href)} className="rounded-md border-2 border-ink/15 bg-white px-7 py-4 text-sm font-bold uppercase text-[#0b2c4a]">Copy link</button></div></form></div>;
+  const shareImage = async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080;
+    canvas.height = 1350;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.fillStyle = '#f6f2e9';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#b52e28';
+    context.fillRect(0, 0, 36, canvas.height);
+    context.fillStyle = '#0b2c4a';
+    context.font = '700 38px Arial';
+    context.fillText('37th IMLC & IYLC 2027', 90, 110);
+    context.font = '700 112px Arial';
+    context.fillText('I WILL BE', 90, 780);
+    context.fillText('ATTENDING', 90, 900);
+    context.fillStyle = '#b52e28';
+    context.font = '700 30px Arial';
+    context.fillText('19–24 JAN 2027 · IBADAN', 90, 1010);
+    context.fillStyle = '#0b2c4a';
+    context.font = '700 48px Arial';
+    context.fillText(name || 'Your name', 90, 1110);
+    context.fillStyle = '#5b6773';
+    context.font = '400 30px Arial';
+    context.fillText(church || 'Ministry and leadership conference', 90, 1165);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) return;
+    const file = new File([blob], 'jan-conf-attending-card.png', { type: 'image/png' });
+    if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+      await navigator.share({ title: 'I will be attending Jan. Conf 2027', text: 'I will be attending Jan. Conf 2027 in Ibadan.', files: [file] }).catch(() => undefined);
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = file.name;
+    link.click();
+    URL.revokeObjectURL(url);
+    setMessage('Your attending card image was downloaded.');
+  };
+  return <div className="grid gap-8 2xl:grid-cols-[minmax(0,600px)_minmax(0,1fr)]"><div className="rounded-[1.75rem] bg-[#fbf7ee] p-4 shadow-sm sm:p-8"><div id="attending-card" className="relative mx-auto aspect-[.72] w-full max-w-[510px] overflow-hidden rounded-[1.5rem] border-l-[10px] border-[#b52e28] bg-[#f6f2e9] p-7 shadow-[0_18px_40px_rgba(7,29,54,.14)] sm:p-9"><div className="absolute right-7 top-7 h-36 w-28 rounded-2xl border-8 border-white bg-[#dbe9f8] p-3 text-center text-xs font-bold text-[#1469a9] sm:right-9 sm:top-9">YOUR<br />PHOTO</div><p className="font-display text-base uppercase text-[#0b2c4a] sm:text-lg">37th IMLC<br />& IYLC 2027</p><div className="absolute bottom-9 left-7 right-7 sm:bottom-12 sm:left-9 sm:right-9"><p className="font-display text-[clamp(2.6rem,8vw,5.8rem)] uppercase leading-[.78] text-[#03284a]">I will be<br />attending</p><p className="mt-5 break-words text-lg font-bold sm:text-xl">{name || 'Your name'}</p><p className="mt-2 text-[10px] font-bold uppercase tracking-[.1em] text-[#b52e28] sm:text-xs">19–24 Jan 2027 · Ibadan</p></div></div></div><form onSubmit={save} className="rounded-[1.75rem] bg-white p-6 shadow-sm sm:p-8"><p className="eyebrow text-[#b52e28]">Share the invite</p><h2 className="mt-4 font-display text-5xl uppercase leading-[.85] text-[#03284a] sm:text-7xl">I will be<br /><span className="text-coral">attending.</span></h2><p className="mt-5 max-w-md text-sm leading-6 text-ink/60">Personalize your card, save it, and share the image directly to social apps from your phone.</p><label className="mt-8 block text-xs font-bold uppercase tracking-[.12em] text-ink/60">Name on card<input required value={name} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-lg border-2 border-ink/15 bg-white px-4 py-4 text-base outline-none focus:border-[#1469a9]" /></label><label className="mt-6 block text-xs font-bold uppercase tracking-[.12em] text-ink/60">Church / ministry<input value={church} onChange={(event) => setChurch(event.target.value)} className="mt-2 w-full rounded-lg border-2 border-ink/15 bg-white px-4 py-4 text-base outline-none focus:border-[#1469a9]" /></label>{message && <p className="mt-5 rounded-lg bg-[#dff2e5] px-4 py-3 text-sm font-bold text-[#34865e]">{message}</p>}<div className="mt-8 flex flex-wrap gap-3"><button type="submit" disabled={saving} className="rounded-md bg-[#1469a9] px-7 py-4 text-sm font-bold uppercase text-white">{saving ? 'Saving…' : 'Save card'}</button><button type="button" onClick={() => void shareImage()} className="rounded-md border-2 border-ink/15 bg-white px-7 py-4 text-sm font-bold uppercase text-[#0b2c4a]">Share image</button></div></form></div>;
 }
 
 function Testimonials() {
