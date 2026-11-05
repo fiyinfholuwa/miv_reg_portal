@@ -26,7 +26,9 @@
       "Bash(npx --yes vercel env rm API_URL --yes)",
       "Bash(npx --yes vercel env add API_URL production)",
       "Bash(npx --yes vercel env add API_URL preview --yes)",
-      "Bash(npx --yes vercel redeploy https://miv-reg-portal-fucwo3iy5-fiyinfholuwas-projects.vercel.app --target production)"
+      "Bash(npx --yes vercel redeploy https://miv-reg-portal-fucwo3iy5-fiyinfholuwas-projects.vercel.app --target production)",
+      "Bash(curl -s --max-time 30 -H \"Accept: application/json\" -H \"Content-Type: application/json\" -d '{\"email\":\"admin@janconf.test\",\"password\":\"ChangeThisAdminPassword!\",\"device_name\":\"diagnostic-check\"}' https://miv-api.unifiechat.com/api/admin/login)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('LOGIN OK for', d['admin']['email']\\) if 'token' in d else print\\('rejected:', d.get\\('message'\\)\\)\")"
     ]
   }
 }

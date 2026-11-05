@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { API_URL } from '../../lib/api';
 import { api } from './adminApi';
+import { PasswordInput } from './adminUi';
 import EventContentManager from './EventContentManager';
 import EventsManager from './EventsManager';
 import LandingContentManager from './LandingContentManager';
@@ -169,7 +170,7 @@ function AdminLogin({ onLoggedIn }: { onLoggedIn: () => void }) {
     } catch (loginError) { toast.error(errorMessage(loginError, 'Admin login failed.'), { title: 'Sign-in failed' }); }
     finally { setSubmitting(false); }
   };
-  return <main className="grid min-h-screen place-items-center bg-[#e8edf3] p-5"><form onSubmit={submit} className="w-full max-w-md rounded-[1.75rem] bg-cream p-7 shadow-2xl sm:p-10"><Brand light /><p className="eyebrow mt-12">Admin access</p><h1 className="page-title mt-3 text-[#03284a]">Welcome back.</h1><p className="type-body-muted mt-5 text-ink/60">Use the seeded administrator account or your configured admin credentials.</p><label className="form-label mt-7 block">Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="form-control" /></label><label className="form-label mt-5 block">Password<input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="form-control" /></label><button disabled={submitting} className="mt-7 w-full rounded-full bg-[#1469a9] px-5 py-4 text-sm font-bold text-white disabled:opacity-60">{submitting ? 'Signing in…' : 'Sign in to admin'}</button></form></main>;
+  return <main className="grid min-h-screen place-items-center bg-[#e8edf3] p-5"><form onSubmit={submit} className="w-full max-w-md rounded-[1.75rem] bg-cream p-7 shadow-2xl sm:p-10"><Brand light /><p className="eyebrow mt-12">Admin access</p><h1 className="page-title mt-3 text-[#03284a]">Welcome back.</h1><p className="type-body-muted mt-5 text-ink/60">Use the seeded administrator account or your configured admin credentials.</p><label className="form-label mt-7 block">Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="form-control" /></label><label className="form-label mt-5 block">Password<PasswordInput required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="form-control" /></label><button disabled={submitting} className="mt-7 w-full rounded-full bg-[#1469a9] px-5 py-4 text-sm font-bold text-white disabled:opacity-60">{submitting ? 'Signing in…' : 'Sign in to admin'}</button></form></main>;
 }
 
 function Brand({ light = false }: { light?: boolean }) { return <div className={`flex items-center gap-3 ${light ? 'text-[#03284a]' : 'text-white'}`}><span className="grid h-10 w-10 place-items-center rounded-full border border-[#9bc4e5]/40 bg-[#0a3557] text-xs font-bold">M</span><span className="font-display text-xl uppercase leading-none">MIV Admin</span></div>; }

@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { errorMessage, toast } from '../../lib/toast';
 import { api } from './adminApi';
-import { Field, card, input } from './adminUi';
+import { Field, PasswordInput, card, input } from './adminUi';
 import { Modal, formatDate, primaryButton, secondaryButton } from './table';
 
 type Profile = { id: number; name: string; email: string; phone: string | null; sessions: number; created_at: string | null };
@@ -26,7 +26,6 @@ export function SettingsView({ onProfileChange }: { onProfileChange?: (profile: 
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [details, setDetails] = useState({ name: '', email: '', phone: '' });
   const [passwords, setPasswords] = useState({ current_password: '', password: '', password_confirmation: '' });
-  const [showPasswords, setShowPasswords] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newAdmin, setNewAdmin] = useState({ name: '', email: '', password: '' });
   const [busy, setBusy] = useState<string | null>(null);
@@ -69,7 +68,6 @@ export function SettingsView({ onProfileChange }: { onProfileChange?: (profile: 
   };
 
   if (!profile) return <div className="h-64 animate-pulse rounded-[1.5rem] bg-white" />;
-  const passwordType = showPasswords ? 'text' : 'password';
 
   return (
     <div className="grid gap-5">
@@ -84,10 +82,9 @@ export function SettingsView({ onProfileChange }: { onProfileChange?: (profile: 
 
       <Section title="Password" description={`${PASSWORD_HINT} Changing it signs you out everywhere else.`}>
         <form onSubmit={savePassword} className="grid gap-4 sm:grid-cols-2">
-          <Field title="Current password" className="sm:col-span-2"><input required type={passwordType} autoComplete="current-password" value={passwords.current_password} onChange={(event) => setPasswords({ ...passwords, current_password: event.target.value })} className={input} /></Field>
-          <Field title="New password"><input required minLength={10} type={passwordType} autoComplete="new-password" value={passwords.password} onChange={(event) => setPasswords({ ...passwords, password: event.target.value })} className={input} /></Field>
-          <Field title="Confirm new password"><input required minLength={10} type={passwordType} autoComplete="new-password" value={passwords.password_confirmation} onChange={(event) => setPasswords({ ...passwords, password_confirmation: event.target.value })} className={input} /></Field>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={showPasswords} onChange={(event) => setShowPasswords(event.target.checked)} className="h-4 w-4" />Show passwords</label>
+          <Field title="Current password" className="sm:col-span-2"><PasswordInput required autoComplete="current-password" value={passwords.current_password} onChange={(event) => setPasswords({ ...passwords, current_password: event.target.value })} className={input} /></Field>
+          <Field title="New password"><PasswordInput required minLength={10} autoComplete="new-password" value={passwords.password} onChange={(event) => setPasswords({ ...passwords, password: event.target.value })} className={input} /></Field>
+          <Field title="Confirm new password"><PasswordInput required minLength={10} autoComplete="new-password" value={passwords.password_confirmation} onChange={(event) => setPasswords({ ...passwords, password_confirmation: event.target.value })} className={input} /></Field>
           <div className="sm:col-span-2"><button type="submit" disabled={busy === 'password'} className={primaryButton}>{busy === 'password' ? 'Changing…' : 'Change password'}</button></div>
         </form>
       </Section>
@@ -117,7 +114,7 @@ export function SettingsView({ onProfileChange }: { onProfileChange?: (profile: 
           <form id="admin-form" onSubmit={addAdmin} className="grid gap-4">
             <Field title="Full name"><input required value={newAdmin.name} onChange={(event) => setNewAdmin({ ...newAdmin, name: event.target.value })} className={input} /></Field>
             <Field title="Email"><input required type="email" value={newAdmin.email} onChange={(event) => setNewAdmin({ ...newAdmin, email: event.target.value })} className={input} /></Field>
-            <Field title="Temporary password"><input required minLength={10} type="text" value={newAdmin.password} onChange={(event) => setNewAdmin({ ...newAdmin, password: event.target.value })} className={input} /><span className="text-xs text-ink/50">{PASSWORD_HINT} Ask them to change it in Settings.</span></Field>
+            <Field title="Temporary password"><PasswordInput required minLength={10} autoComplete="new-password" value={newAdmin.password} onChange={(event) => setNewAdmin({ ...newAdmin, password: event.target.value })} className={input} /><span className="text-xs text-ink/50">{PASSWORD_HINT} Ask them to change it in Settings.</span></Field>
           </form>
         </Modal>
       )}
