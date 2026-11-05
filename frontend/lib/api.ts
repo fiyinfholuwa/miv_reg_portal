@@ -1,4 +1,6 @@
-const configuredApiUrl = process.env.API_URL?.trim().replace(/\/+$/, '');
+// Laravel serves every route under /api, so accept API_URL with or without it
+// ("https://api.example.com" and "https://api.example.com/api" both work).
+const configuredApiUrl = process.env.API_URL?.trim().replace(/\/+$/, '').replace(/^(.+?)(?:\/api)?$/, '$1/api') || undefined;
 const browserHost = typeof window === 'undefined' ? '' : window.location.hostname;
 const pointsToLoopback = Boolean(configuredApiUrl && /:\/\/(localhost|127\.0\.0\.1)(:\d+)?(?:\/|$)/i.test(configuredApiUrl));
 const isLocalBrowser = browserHost === 'localhost' || browserHost === '127.0.0.1';
