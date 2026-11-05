@@ -1,7 +1,17 @@
 'use client';
 
-import Link from 'next/link';
 import { cardThemes, openRegistration, type HubEvent } from './hub-data';
+
+function EventActions({ event, dark, compact }: { event: HubEvent; dark: boolean; compact?: boolean }) {
+  const size = compact ? 'px-3.5 py-2 text-xs' : 'px-5 py-2.5 text-[13px]';
+  return (
+    <div className={`flex flex-wrap items-center justify-between gap-3 ${compact ? 'mt-1' : ''}`}>
+      {event.registration_open
+        ? <button type="button" onClick={() => openRegistration({ event: event.slug })} className={`rounded-full font-bold transition ${size} ${dark ? 'bg-white text-[#00203f] hover:bg-[#faf6ec]' : 'bg-[#a82e26] text-white hover:bg-[#8c1f1c]'}`}>Register →</button>
+        : <span className={`font-bold opacity-70 ${compact ? 'text-xs' : 'text-[13px]'}`}>Registration opens soon</span>}
+    </div>
+  );
+}
 
 export function EventCard({ event, index }: { event: HubEvent; index: number }) {
   const theme = cardThemes[index % cardThemes.length];
@@ -16,12 +26,7 @@ export function EventCard({ event, index }: { event: HubEvent; index: number }) 
         <span className="text-[26px] font-semibold opacity-55">{String(index + 1).padStart(2, '0')}</span>
         <h3 className="text-2xl font-semibold leading-[1.15] tracking-[-0.01em]">{event.title}</h3>
         <p className="flex-1 text-[15px] leading-normal opacity-80">{event.summary}</p>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href={`/events/${event.slug}`} className="flex items-center gap-2 text-sm font-bold" style={{ color: 'inherit' }}>Learn more <span aria-hidden="true">→</span></Link>
-          {event.registration_open && (
-            <button type="button" onClick={() => openRegistration({ event: event.slug })} className={`rounded-full px-4 py-2 text-[13px] font-bold transition ${dark ? 'bg-white/15 text-white hover:bg-white/25' : 'bg-[#00203f] text-white hover:bg-[#003070]'}`}>Register</button>
-          )}
-        </div>
+        <EventActions event={event} dark={dark} />
       </div>
     </article>
   );
@@ -37,10 +42,7 @@ export function EventCardCompact({ event, index }: { event: HubEvent; index: num
       <div className="flex flex-1 flex-col gap-1.5 px-4 pb-[18px] pt-3.5">
         <span className="text-xs font-semibold opacity-70">{event.date_label}</span>
         <h3 className="flex-1 text-lg font-bold leading-[1.2]">{event.title}</h3>
-        <div className="mt-1 flex items-center justify-between gap-2">
-          <Link href={`/events/${event.slug}`} className="text-[13px] font-bold" style={{ color: 'inherit' }}>Learn more →</Link>
-          {event.registration_open && <button type="button" onClick={() => openRegistration({ event: event.slug })} className={`rounded-full px-3 py-1.5 text-xs font-bold ${dark ? 'bg-white/15 text-white' : 'bg-[#00203f] text-white'}`}>Register</button>}
-        </div>
+        <EventActions event={event} dark={dark} compact />
       </div>
     </article>
   );

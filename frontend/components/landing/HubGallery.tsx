@@ -115,7 +115,7 @@ export default function HubGallery({ events }: { events: HubEvent[] }) {
   }, [filter, query, shortNames]);
 
   return (
-    <section id="gallery" className="flex scroll-mt-4 flex-col gap-6 overflow-hidden pb-16 pt-16 text-[#0c0d10] sm:gap-9 sm:pb-20 sm:pt-24">
+    <section id="gallery" className="flex scroll-mt-28 flex-col gap-6 overflow-hidden pb-16 pt-16 text-[#0c0d10] sm:gap-9 sm:pb-20 sm:pt-24">
       <div className="flex flex-col gap-4 px-5 sm:items-center sm:px-10 sm:text-center lg:px-[72px]">
         <span className="text-sm font-semibold text-[#a82e26] sm:text-[15px]">Gallery</span>
         <h2 className="m-0 max-w-[720px] text-[32px] font-medium leading-[1.1] tracking-[-0.02em] [text-wrap:balance] sm:text-[44px] lg:text-[52px]">Moments from past events, in pictures and video</h2>

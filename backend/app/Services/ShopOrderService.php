@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\ShopOrder;
-use App\Models\ShopProduct;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -12,26 +11,15 @@ use Illuminate\Validation\ValidationException;
 
 class ShopOrderService
 {
+    public function __construct(private readonly ShopLineItems $lineItems) {}
+
     public function initialize(User $user, array $items): array
     {
-        $quantities = collect($items)->groupBy('product_id')->map(fn ($productItems): int => (int) collect($productItems)->sum('quantity'));
-        $products = ShopProduct::query()->where('active', true)->whereIn('id', $quantities->keys())->get()->keyBy('id');
+        $lines = $this->lineItems->resolve($items);
+        $total = $lines->sum(fn (array $line): int => $line['product']->price * $line['quantity']);
 
-        if ($products->count() !== $quantities->count()) {
-            throw ValidationException::withMessages(['items' => ['One or more products are no longer available.']]);
-        }
-
-        $total = 0;
-        foreach ($quantities as $productId => $quantity) {
-            $product = $products->get($productId);
-            if ($product->stock !== null && $product->stock < $quantity) {
-                throw ValidationException::withMessages(['items' => ["{$product->name} does not have enough stock available."]]);
-            }
-            $total += $product->price * $quantity;
-        }
-
-        $reference = 'JC27-' . Str::upper(Str::random(20));
-        $order = DB::transaction(function () use ($user, $reference, $total, $quantities, $products): ShopOrder {
+        $reference = 'JC27-'.Str::upper(Str::random(20));
+        $order = DB::transaction(function () use ($user, $reference, $total, $lines): ShopOrder {
             $order = $user->shopOrders()->create([
                 'reference' => $reference,
                 'status' => 'pending',
@@ -39,16 +27,19 @@ class ShopOrderService
                 'currency' => 'NGN',
                 'payment_provider' => 'paystack',
             ]);
-            foreach ($quantities as $productId => $quantity) {
-                $product = $products->get($productId);
+            foreach ($lines as $line) {
+                $product = $line['product'];
                 $order->items()->create([
                     'shop_product_id' => $product->id,
                     'name' => $product->name,
-                    'quantity' => $quantity,
+                    'color' => $line['color'] !== '' ? $line['color'] : null,
+                    'size' => $line['size'] !== '' ? $line['size'] : null,
+                    'quantity' => $line['quantity'],
                     'unit_price' => $product->price,
-                    'line_total' => $product->price * $quantity,
+                    'line_total' => $product->price * $line['quantity'],
                 ]);
             }
+
             return $order;
         });
 
@@ -58,12 +49,12 @@ class ShopOrderService
             throw ValidationException::withMessages(['payment' => ['Paystack is not configured on the server yet.']]);
         }
 
-        $response = Http::withToken($secret)->acceptJson()->post((string) config('services.paystack.base_url') . '/transaction/initialize', [
+        $response = Http::withToken($secret)->acceptJson()->post((string) config('services.paystack.base_url').'/transaction/initialize', [
             'email' => $user->email,
             'amount' => (string) ($order->total * 100),
             'currency' => $order->currency,
             'reference' => $order->reference,
-            'callback_url' => rtrim((string) config('services.frontend_url'), '/') . '/shop/orders/' . urlencode($order->reference) . '?payment=success',
+            'callback_url' => rtrim((string) config('services.frontend_url'), '/').'/shop/orders/'.urlencode($order->reference).'?payment=success',
             'metadata' => ['order_id' => $order->id, 'pickup' => 'Store collection at Jan. Conf 2027'],
         ]);
 
@@ -78,9 +69,11 @@ class ShopOrderService
     public function verify(User $user, string $reference): array
     {
         $order = $user->shopOrders()->where('reference', $reference)->with('items')->firstOrFail();
-        if ($order->status === 'paid') return $this->payload($order);
+        if ($order->status === 'paid') {
+            return $this->payload($order);
+        }
 
-        $response = Http::withToken((string) config('services.paystack.secret_key'))->acceptJson()->get((string) config('services.paystack.base_url') . '/transaction/verify/' . urlencode($reference));
+        $response = Http::withToken((string) config('services.paystack.secret_key'))->acceptJson()->get((string) config('services.paystack.base_url').'/transaction/verify/'.urlencode($reference));
         $payment = $response->json();
         $paymentData = data_get($payment, 'data');
         if (! $response->successful() || ! data_get($payment, 'status') || data_get($paymentData, 'status') !== 'success' || (int) data_get($paymentData, 'amount') !== $order->total * 100) {
@@ -90,6 +83,7 @@ class ShopOrderService
 
         $order->update(['status' => 'paid', 'paid_at' => now(), 'pickup_code' => $order->pickup_code ?: $this->newPickupCode(), 'payment_data' => ['verify' => $payment]]);
         $user->shopCartItems()->delete();
+
         return $this->payload($order->fresh('items'));
     }
 
@@ -105,12 +99,15 @@ class ShopOrderService
 
     private function payload(ShopOrder $order): array
     {
-        return ['id' => $order->id, 'reference' => $order->reference, 'status' => $order->status, 'total' => $order->total, 'currency' => $order->currency, 'pickup_code' => $order->pickup_code, 'paid_at' => $order->paid_at?->toIso8601String(), 'created_at' => $order->created_at?->toIso8601String(), 'items' => $order->items->map(fn ($item): array => ['name' => $item->name, 'quantity' => $item->quantity, 'unit_price' => $item->unit_price, 'line_total' => $item->line_total])->all()];
+        return ['id' => $order->id, 'reference' => $order->reference, 'status' => $order->status, 'total' => $order->total, 'currency' => $order->currency, 'pickup_code' => $order->pickup_code, 'paid_at' => $order->paid_at?->toIso8601String(), 'created_at' => $order->created_at?->toIso8601String(), 'items' => $order->items->map(fn ($item): array => ['name' => $item->name, 'color' => $item->color, 'size' => $item->size, 'quantity' => $item->quantity, 'unit_price' => $item->unit_price, 'line_total' => $item->line_total])->all()];
     }
 
     private function newPickupCode(): string
     {
-        do { $code = 'JC27-ORD-' . Str::upper(Str::random(8)); } while (ShopOrder::where('pickup_code', $code)->exists());
+        do {
+            $code = 'JC27-ORD-'.Str::upper(Str::random(8));
+        } while (ShopOrder::where('pickup_code', $code)->exists());
+
         return $code;
     }
 }

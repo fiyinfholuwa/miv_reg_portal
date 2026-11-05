@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -I -c ' *)",
+      "Bash(composer -V)",
+      "Bash(curl -s -m 5 http://127.0.0.1:8000/api/events)",
+      "Bash(pkill -f \"next dev -p 3917\")",
+      "Bash(curl -s -m 5 http://127.0.0.1:8001/api/events)",
+      "Bash(lsof -iTCP -sTCP:LISTEN -nP)",
+      "Bash(npx next *)",
+      "Bash(grep -o \".\\\\{0,200\\\\}setMessage.\\\\{0,200\\\\}\")",
+      "Bash(grep -o \"{message &&.\\\\{0,120\\\\}\")",
+      "Bash(python3 /private/tmp/claude-501/-Users-macbook-Desktop-miv-reg-portal/b089e517-a1a9-41c4-a41d-a3060f20328d/scratchpad/migrate2.py)",
+      "Bash(curl -s --max-time 20 http://localhost:3000/)",
+      "Bash(lsof -nP -iTCP -sTCP:LISTEN)"
+    ]
+  }
+}

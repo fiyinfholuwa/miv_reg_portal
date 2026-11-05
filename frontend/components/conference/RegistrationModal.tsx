@@ -1,7 +1,9 @@
 'use client';
 
+import { toast } from '../../lib/toast';
 import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import AttendingCardStudio from '../attending/AttendingCardStudio';
 import {
   AccountUser,
   ApiError,
@@ -55,8 +57,6 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
   const [days, setDays] = useState<string[]>([]);
   const [accommodation, setAccommodation] = useState(false);
 
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const returnToRef = useRef('/dashboard');
@@ -99,8 +99,6 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
   const start = useCallback(async (detail: OpenDetail) => {
     setOpen(true);
     setStep('loading');
-    setError('');
-    setNotice('');
     setOtp('');
     setRegistration(null);
     setReturnTo(detail.returnTo || '/dashboard');
@@ -112,7 +110,7 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
     try {
       if (detail.event) selected = await fetchEvent(detail.event);
     } catch {
-      setError('We could not load that event. You can still sign in and choose it from your dashboard.');
+      toast.error('We could not load that event. You can still sign in and choose it from your dashboard.');
     }
     setEvent(selected);
     resetAttendance(selected);
@@ -125,7 +123,7 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
         return;
       } catch (sessionError) {
         if (sessionError instanceof ApiError && sessionError.status === 401) clearSession();
-        else if (sessionError instanceof ApiError) setError(sessionError.message);
+        else if (sessionError instanceof ApiError) toast.error(sessionError.message);
       }
     }
     setStep(detail.mode === 'login' ? 'login' : 'register');
@@ -166,7 +164,6 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
 
   function close() {
     setOpen(false);
-    setError('');
     if (closeTo) router.push(closeTo);
   }
 
@@ -201,8 +198,6 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
 
   const submit = async (formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
-    setError('');
-    setNotice('');
     setSubmitting(true);
     try {
       if (step === 'register') {
@@ -223,25 +218,23 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
         setUser((current) => current ? { ...current, registered_events: [...current.registered_events, event.slug] } : current);
         setStep('done');
       } else if (step === 'done' || step === 'already') {
-        finish(event ? `/dashboard?registered=${event.slug}` : returnTo);
+        finish(event ? `/dashboard/events/${event.slug}${step === 'done' ? '?welcome=1' : ''}` : returnTo);
       }
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Something went wrong. Please try again.');
+      toast.error(submitError instanceof Error ? submitError.message : 'Something went wrong. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const resendCode = async () => {
-    setError('');
-    setNotice('');
     setSubmitting(true);
     try {
       await (flow === 'login' ? sendLogin() : sendRegister());
       setOtp('');
-      setNotice('A new code is on its way to your email.');
+      toast.success('A new code is on its way to your email.');
     } catch (resendError) {
-      setError(resendError instanceof Error ? resendError.message : 'We could not resend the code.');
+      toast.error(resendError instanceof Error ? resendError.message : 'We could not resend the code.');
     } finally {
       setSubmitting(false);
     }
@@ -249,13 +242,10 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
 
   const switchTo = (next: 'register' | 'login') => {
     setFlow(next);
-    setError('');
-    setNotice('');
     setStep(next);
   };
 
   const goBack = () => {
-    setError('');
     if (step === 'otp') setStep(flow);
     else close();
   };
@@ -272,7 +262,7 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
     profile: 'A little about you',
     attendance: 'How will you attend?',
     already: "You're already registered",
-    done: "You're registered",
+    done: "You're in! Share the news",
   };
   const submitLabel: Record<Step, string> = {
     loading: 'Please wait…',
@@ -281,13 +271,13 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
     otp: 'Verify code',
     profile: event ? 'Continue' : 'Save and go to dashboard',
     attendance: 'Complete registration',
-    already: 'Go to my dashboard',
-    done: 'Go to my dashboard',
+    already: 'Open my event',
+    done: 'Go to my event',
   };
 
   return (
     <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#001428]/70 p-3 backdrop-blur-sm sm:p-6 lg:p-10" onMouseDown={(mouseEvent) => { if (mouseEvent.target === mouseEvent.currentTarget) close(); }}>
-      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="registration-title" className="mx-auto flex max-w-4xl overflow-hidden rounded-[28px] bg-[#faf6ec] text-[#0c0d10] shadow-[0_26px_60px_rgba(0,20,40,.35)] outline-none" style={{ fontFamily: "'Barlow', var(--font-inter), system-ui, sans-serif" }}>
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="registration-title" className="mx-auto flex max-w-5xl overflow-hidden rounded-[28px] bg-[#faf6ec] text-[#0c0d10] shadow-[0_26px_60px_rgba(0,20,40,.35)] outline-none" style={{ fontFamily: "'Barlow', var(--font-inter), system-ui, sans-serif" }}>
         <aside className="hidden w-[230px] shrink-0 flex-col bg-[#001428] p-6 text-[#faf6ec] md:flex">
           <div className="flex items-center gap-3">
             <img src="/images/miv-logo.png" alt="" className="h-10 w-10 object-contain" />
@@ -396,21 +386,21 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
                 </div>
               )}
 
-              {(step === 'done' || step === 'already') && event && (
-                <div className="max-w-xl">
-                  <p className="text-[#4d5460]">{step === 'done' ? <>Welcome{user ? `, ${user.name.split(' ')[0]}` : ''}! You’re registered for <strong className="text-[#0c0d10]">{event.title}</strong>.</> : <>You’re already registered for <strong className="text-[#0c0d10]">{event.title}</strong>. Your ticket is in your dashboard.</>}</p>
-                  {registration && (
-                    <div className="mt-6 rounded-2xl bg-[#001428] p-5 text-[#faf6ec]">
-                      <p className="text-sm text-[#bcd6ec]">{event.date_label}{registration.attendance_mode ? ` · ${registration.attendance_mode}` : ''}</p>
-                      <p className="mt-2 text-sm text-[#bcd6ec]">Ticket code</p>
-                      <p className="text-3xl font-bold tracking-wide">{registration.ticket_code}</p>
-                    </div>
-                  )}
+              {step === 'already' && event && (
+                <p className="max-w-xl text-[#4d5460]">You’re already registered for <strong className="text-[#0c0d10]">{event.title}</strong>. Your ticket, programme and attending card are in your dashboard.</p>
+              )}
+
+              {step === 'done' && event && (
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#001428] px-5 py-4 text-[#faf6ec]">
+                    <p className="text-sm text-[#bcd6ec]">Welcome{user ? `, ${user.name.split(' ')[0]}` : ''}! Your ticket for <strong className="text-white">{event.short_name}</strong></p>
+                    {registration && <p className="text-xl font-bold tracking-wide">{registration.ticket_code}</p>}
+                  </div>
+                  <p className="mb-4 mt-5 text-[#4d5460]">Add your photo to your <strong className="text-[#0c0d10]">I will be attending</strong> card and invite others. You can also do this later from your dashboard.</p>
+                  <AttendingCardStudio compact event={event} name={user?.name ?? name} church={user?.church ?? church} hasSavedPhoto={user?.has_photo ?? false} onPhotoSaved={() => setUser((current) => current ? { ...current, has_photo: true } : current)} />
                 </div>
               )}
 
-              {notice && <p className="mt-5 rounded-xl bg-[#dcefe2] px-4 py-3 text-sm font-semibold text-[#2f7d4f]" role="status">{notice}</p>}
-              {error && <p className="mt-5 rounded-xl bg-[#f8e0dc] px-4 py-3 text-sm font-semibold text-[#a82e26]" role="alert">{error}</p>}
             </div>
 
             <div className="mt-8 flex items-center justify-between gap-4 border-t border-[#e4e7ec] pt-5">
@@ -437,7 +427,7 @@ function SwitchPrompt({ text, action, onClick }: { text: string; action: string;
 }
 
 function stepList(flow: 'register' | 'login', event: MivEvent | null) {
-  const eventStep = event ? [{ label: needsAttendanceStep(event) ? 'Attendance' : 'Confirm', keys: ['attendance', 'already', 'done'] as Step[] }] : [];
+  const eventStep = event ? [{ label: needsAttendanceStep(event) ? 'Attendance' : 'Confirm', keys: ['attendance', 'already'] as Step[] }, { label: 'Your card', keys: ['done'] as Step[] }] : [];
   if (flow === 'login') {
     return [{ label: 'Your email', keys: ['loading', 'login', 'otp'] as Step[] }, ...eventStep];
   }

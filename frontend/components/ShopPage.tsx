@@ -1,132 +1,91 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import RegistrationModal from './conference/RegistrationModal';
-import { Mark } from './conference/ConferenceAtoms';
-import { merch } from './conference/conference-data';
+import { HubFooter, HubNav } from './landing/HubChrome';
+import { naira } from './landing/hub-data';
+import CartButton from './shop/CartButton';
+import { SwatchRow } from './shop/VariantPicker';
+import { useShopCart } from './shop/useShopCart';
 import { apiUrl } from '../lib/api';
-import { fetchAccountCart, mergeCart, persistAccountCart, productSlug, readCart, type Cart } from '../lib/shop';
-import ShopToast from './shop/ShopToast';
+import { cartKey, productColors, productImage, productSizes, productSlug, type ShopProduct } from '../lib/shop';
+import { errorMessage, toast } from '../lib/toast';
 
-type Product = {
-  id?: number;
-  name: string;
-  description?: string | null;
-  price: number;
-  image?: string | null;
-  tag?: string | null;
-  stock?: number | null;
-};
+function ProductCard({ product, onAdd }: { product: ShopProduct; onAdd: (product: ShopProduct, color: string) => void }) {
+  const colors = productColors(product);
+  const [color, setColor] = useState(colors[0]?.name ?? '');
+  const needsSize = productSizes(product).length > 0;
+  const href = `/shop/${productSlug(product.name)}${color ? `?color=${encodeURIComponent(color)}` : ''}`;
+  const soldOut = product.stock === 0;
 
-const fallbackProducts: Product[] = merch.map((item, index) => ({ ...item, id: index + 1, price: Number(item.price.replace(/[^0-9]/g, '')), description: 'Official Jan. Conf 2027 merchandise.' }));
+  return (
+    <article className="group flex flex-col rounded-[22px] border border-[#e4e7ec] bg-white px-2.5 pb-3 pt-2.5 transition hover:-translate-y-1 hover:shadow-lg">
+      <Link href={href} className="flex flex-1 flex-col gap-3">
+        <div className="relative aspect-square overflow-hidden rounded-2xl bg-[#f4eddc]">
+          <img src={productImage(product, color)} alt={`${product.name}${color ? ` in ${color}` : ''}`} className="block h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" />
+          {product.tag && <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1 text-xs font-bold text-[#0c0d10]">{product.tag}</span>}
+          {soldOut && <span className="absolute right-3 top-3 rounded-full bg-[#0c0d10] px-3 py-1 text-xs font-bold text-white">Sold out</span>}
+        </div>
+        <div className="flex flex-1 flex-col gap-1 px-2">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2"><h2 className="m-0 text-[15px] font-semibold text-[#0c0d10] sm:text-base">{product.name}</h2><span className="text-[15px] font-bold text-[#a82e26] sm:text-base">{naira(product.price)}</span></div>
+          <p className="m-0 hidden text-sm leading-5 text-[#4d5460] sm:block">{product.description || 'Official MIV merchandise.'}</p>
+        </div>
+      </Link>
+      <div className="mt-3 px-2"><SwatchRow colors={colors} value={color} onChange={setColor} /></div>
+      {needsSize
+        ? <Link href={href} aria-disabled={soldOut} className={`mx-2 mt-3 rounded-full px-4 py-3 text-center text-sm font-bold transition ${soldOut ? 'pointer-events-none bg-[#e4e7ec] text-[#6b7280]' : 'bg-[#00203f] text-white hover:bg-[#003070]'}`}>{soldOut ? 'Sold out' : 'Choose size →'}</Link>
+        : <button type="button" disabled={soldOut} onClick={() => onAdd(product, color)} className="mx-2 mt-3 rounded-full bg-[#00203f] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#003070] disabled:bg-[#e4e7ec] disabled:text-[#6b7280]">{soldOut ? 'Sold out' : 'Add to cart'}</button>}
+    </article>
+  );
+}
 
 export default function ShopPage() {
-  const [products, setProducts] = useState<Product[]>(fallbackProducts);
-  const [cart, setCart] = useState<Cart>({});
-  const [notice, setNotice] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [paymentNotice, setPaymentNotice] = useState('');
-  const [cartLoaded, setCartLoaded] = useState(false);
-  const [accountCartLoaded, setAccountCartLoaded] = useState(false);
-  const [productsLoaded, setProductsLoaded] = useState(false);
-  const [accountId, setAccountId] = useState<number | null>(null);
+  const { products, setCart, total, count, quantityOf } = useShopCart();
 
   useEffect(() => {
-    const savedCart = window.localStorage.getItem('jan-conf-cart');
-    setCart(readCart(savedCart));
-    setCartLoaded(true);
-    void fetch(apiUrl('/shop/products'))
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Shop unavailable')))
-      .then((data) => {
-        if (!Array.isArray(data.products) || !data.products.length) return;
-        setProducts((current) => {
-          const merged = new Map(current.map((product) => [product.name, product]));
-          data.products.forEach((product: Product) => merged.set(product.name, product));
-          return Array.from(merged.values());
-        });
-      })
-      .catch(() => undefined)
-      .finally(() => setProductsLoaded(true));
-
-    void fetchAccountCart()
-      .then((accountCart) => {
-        if (!accountCart) return;
-        setAccountId(accountCart.accountId);
-        const owner = window.localStorage.getItem('jan-conf-cart-owner');
-        setCart(owner === String(accountCart.accountId) ? accountCart.cart : mergeCart(accountCart.cart, readCart(savedCart)));
-      })
-      .finally(() => setAccountCartLoaded(true));
-
     const params = new URLSearchParams(window.location.search);
     const reference = params.get('reference');
-    if (params.get('payment') === 'success' && reference && window.localStorage.getItem('jan-conf-session')) {
-      setPaymentNotice('Confirming your payment…');
-      void fetch(apiUrl(`/shop/orders/${encodeURIComponent(reference)}/verify`), { headers: { Accept: 'application/json', Authorization: `Bearer ${window.localStorage.getItem('jan-conf-session')}` } })
-        .then(async (response) => { const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.message || data.errors?.payment?.[0] || 'Payment verification failed.'); return data; })
-        .then((data) => { window.localStorage.removeItem('jan-conf-cart'); setCart({}); setPaymentNotice(`Payment confirmed. Your pickup code is ${data.order.pickup_code}.`); window.history.replaceState({}, '', '/shop'); })
-        .catch((error) => setPaymentNotice(error instanceof Error ? error.message : 'Payment verification failed.'));
+    const token = window.localStorage.getItem('jan-conf-session');
+    if (params.get('payment') !== 'success' || !reference || !token) return;
+    toast.info('Confirming your payment…', { id: 'payment' });
+    void fetch(apiUrl(`/shop/orders/${encodeURIComponent(reference)}/verify`), { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } })
+      .then(async (response) => { const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.message || data.errors?.payment?.[0] || 'Payment verification failed.'); return data; })
+      .then((data) => { window.localStorage.removeItem('jan-conf-cart'); setCart({}); toast.success(`Your pickup code is ${data.order.pickup_code}.`, { id: 'payment', title: 'Payment confirmed', duration: 10000 }); window.history.replaceState({}, '', '/shop'); })
+      .catch((error) => toast.error(errorMessage(error, 'Payment verification failed.'), { id: 'payment', title: 'Payment not confirmed' }));
+  }, [setCart]);
+
+  const addToCart = (product: ShopProduct, color: string) => {
+    if (product.stock != null && quantityOf(product) + 1 > product.stock) {
+      toast.warning(`Only ${product.stock} ${product.name} left in stock.`, { title: 'Not enough stock' });
+      return;
     }
-  }, []);
-
-  useEffect(() => {
-    if (cartLoaded) window.localStorage.setItem('jan-conf-cart', JSON.stringify(cart));
-  }, [cart, cartLoaded]);
-
-  useEffect(() => {
-    if (!cartLoaded || !accountCartLoaded || !productsLoaded || !accountId) return;
-    void persistAccountCart(cart, products, accountId);
-  }, [cart, products, cartLoaded, accountCartLoaded, productsLoaded, accountId]);
-
-  const cartItems = products.filter((product) => cart[product.name]);
-  const total = useMemo(() => cartItems.reduce((sum, product) => sum + product.price * (cart[product.name] || 0), 0), [cartItems, cart]);
-
-  const addToCart = (product: Product) => {
-    setCart((current) => ({ ...current, [product.name]: (current[product.name] || 0) + 1 }));
-    setNotice(`${product.name} added to your cart.`);
-    window.setTimeout(() => setNotice(''), 2200);
+    const key = cartKey(product.name, color);
+    setCart((current) => ({ ...current, [key]: (current[key] || 0) + 1 }));
+    toast.success(`${product.name}${color ? ` (${color})` : ''} added to your cart.`, { title: 'Added to cart' });
   };
 
-  const cartQuantity = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
-
-  return <main className="min-h-screen bg-[#f6f2e9] text-ink">
+  return <main className="miv-hub">
     <RegistrationModal />
-    <ShopToast message={notice} />
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-ink/95 py-3 text-white shadow-lg backdrop-blur-md sm:py-4">
-      <div className="container-shell flex items-center justify-between gap-3">
-        <Link href="/" className="flex items-center gap-2 sm:gap-3" aria-label="Jan Conf home"><Mark /><span className="font-display text-lg uppercase leading-none tracking-wide sm:text-xl">Jan Conf<br /><span className="text-coral">2027</span></span></Link>
-        <nav className="hidden items-center gap-7 text-sm font-semibold text-white/80 lg:flex" aria-label="Main navigation">
-          <Link className="transition hover:text-white" href="/#about">About</Link>
-          <Link className="transition hover:text-white" href="/#speakers">Speakers</Link>
-          <Link className="transition hover:text-white" href="/#schedule">Schedule</Link>
-          <Link className="transition hover:text-white" href="/#venue">Venue</Link>
-          <Link className="transition hover:text-white" href="/#media">Media</Link>
-          <Link className="text-white" href="/shop">Shop</Link>
-        </nav>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-white/10 text-xl transition hover:bg-white/20 lg:hidden" aria-expanded={menuOpen} aria-controls="shop-mobile-navigation" aria-label={menuOpen ? 'Close navigation' : 'Open navigation'}>{menuOpen ? '×' : '☰'}</button>
-          <Link className="button-primary px-3 py-3 text-[10px] sm:px-4 sm:text-xs" href="/#register">Register free <span aria-hidden="true">↗</span></Link>
+    <div className="p-2.5 sm:p-4"><HubNav variant="solid" /></div>
+    <CartButton count={count} />
+
+    <section className="flex flex-col gap-10 px-5 py-12 sm:px-10 sm:py-16 lg:px-[72px]">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-3">
+          <span className="text-sm font-semibold text-[#a82e26] sm:text-[15px]">Shop · pay online, collect at the venue</span>
+          <h1 className="m-0 text-[36px] font-semibold leading-[1.02] tracking-[-0.025em] text-[#0c0d10] sm:text-[56px]">Wear the vision.</h1>
+          <p className="m-0 max-w-xl text-[15px] leading-[1.6] text-[#4d5460] sm:text-base">Pick your colour and size, pay securely online, and collect your order at the conference store. You only sign in at checkout.</p>
+        </div>
+        <div className="rounded-[24px] bg-[#001428] p-6 text-[#faf6ec] lg:w-80">
+          <div className="flex items-start justify-between gap-3">
+            <div><span className="text-sm font-semibold text-[#bcd6ec]">Your cart</span><strong className="mt-1 block text-5xl font-semibold tabular-nums">{count}</strong><span className="mt-1 block text-sm text-[#bcd6ec]">item{count === 1 ? '' : 's'} · {naira(total)}</span></div>
+            <Link href="/shop/cart" className="text-sm font-bold text-white/80 hover:text-white">View cart →</Link>
+          </div>
         </div>
       </div>
-      {menuOpen && <nav id="shop-mobile-navigation" className="absolute left-4 right-4 top-full mt-3 rounded-2xl border border-ink/10 bg-white p-5 text-ink shadow-2xl lg:hidden" aria-label="Mobile navigation">
-        <p className="px-1 pb-3 text-2xl font-bold text-ink">Menu</p>
-        <Link onClick={() => setMenuOpen(false)} className="block border-b border-ink/10 px-1 py-4 text-base font-semibold transition hover:text-coral" href="/#about">About</Link>
-        <Link onClick={() => setMenuOpen(false)} className="block border-b border-ink/10 px-1 py-4 text-base font-semibold transition hover:text-coral" href="/#speakers">Speakers</Link>
-        <Link onClick={() => setMenuOpen(false)} className="block border-b border-ink/10 px-1 py-4 text-base font-semibold transition hover:text-coral" href="/#schedule">Schedule</Link>
-        <Link onClick={() => setMenuOpen(false)} className="block border-b border-ink/10 px-1 py-4 text-base font-semibold transition hover:text-coral" href="/#venue">Accommodation</Link>
-        <Link onClick={() => setMenuOpen(false)} className="block border-b border-ink/10 px-1 py-4 text-base font-semibold transition hover:text-coral" href="/shop">Shop</Link>
-        <Link onClick={() => setMenuOpen(false)} className="mt-5 block rounded-full bg-coral px-4 py-4 text-center text-base font-bold text-white" href="/#register">Register Now</Link>
-      </nav>}
-    </header>
-
-    <Link href="/shop/cart" className="fixed right-4 top-24 z-40 grid h-14 w-14 place-items-center rounded-full bg-white text-2xl text-ink shadow-xl ring-4 ring-[#f6f2e9] transition hover:scale-105" aria-label={`Open cart, ${cartQuantity} item${cartQuantity === 1 ? '' : 's'}`}>
-      <svg className="fa fa-shopping-cart h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1" /><circle cx="18" cy="20" r="1" /><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.5h7.8a2 2 0 0 0 1.9-1.4L21 8H6" /></svg>{cartQuantity > 0 && <span className="absolute -right-1 -top-1 grid h-6 min-w-6 place-items-center rounded-full bg-[#d7263d] px-1 text-xs font-bold text-white">{cartQuantity}</span>}
-    </Link>
-
-    <section className="container-shell py-16 sm:py-24">
-      <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between"><div><p className="eyebrow mb-5">Pay online · collect at the venue</p><h1 className="section-title">Conference<br /><span className="text-coral">shop.</span></h1><p className="mt-6 max-w-xl text-base leading-7 text-ink/65">Browse the official Revival collection before you register. You only need to sign in when you are ready to check out.</p></div><div id="shop-cart" className="rounded-[1.5rem] bg-ink p-6 text-white lg:w-80"><div className="flex items-start justify-between gap-3"><div><p className="eyebrow text-[#ff7565]">Your cart</p><strong className="mt-2 block font-display text-5xl">{cartQuantity}</strong><p className="mt-1 text-sm text-sky/70">items · ₦{total.toLocaleString()}</p></div><Link href="/shop/cart" className="text-xs font-bold uppercase tracking-[.08em] text-white/70 hover:text-white">View cart</Link></div>{paymentNotice && <p className="mt-4 rounded-xl bg-white/10 p-3 text-sm leading-5 text-[#ffcf96]" role="status">{paymentNotice}</p>}</div></div>
-      <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{products.map((product) => <article key={product.id ?? product.name} className="group rounded-[1.5rem] border border-ink/10 bg-white p-3 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"><Link href={`/shop/${productSlug(product.name)}`} className="block"><div className="relative aspect-[.92] overflow-hidden rounded-[1.2rem] bg-[#e7edf3]"><img src={product.image || '/images/miv-logo.png'} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />{product.tag && <span className="absolute left-3 top-3 rounded-full bg-cream px-3 py-1 text-[10px] font-bold uppercase tracking-[.1em]">{product.tag}</span>}</div><div className="p-2 pt-5"><div className="flex items-start justify-between gap-3"><h2 className="font-display text-2xl uppercase leading-none">{product.name}</h2><strong className="shrink-0 text-sm">₦{product.price.toLocaleString()}</strong></div><p className="mt-3 min-h-12 text-sm leading-5 text-ink/55">{product.description || 'Official conference merchandise.'}</p><span className="mt-4 inline-block text-xs font-bold uppercase tracking-[.1em] text-coral">View product details →</span></div></Link><button type="button" onClick={() => addToCart(product)} className="mt-5 w-full rounded-full bg-[#1469a9] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#0b4779]">Add to cart</button></article>)}</div>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">{products.map((product) => <ProductCard key={product.id ?? product.name} product={product} onAdd={addToCart} />)}</div>
     </section>
-
+    <HubFooter />
   </main>;
 }

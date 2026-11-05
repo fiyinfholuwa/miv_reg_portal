@@ -1,5 +1,6 @@
 'use client';
 
+import { errorMessage, toast } from '../../lib/toast';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import RegistrationModal from './RegistrationModal';
@@ -41,7 +42,9 @@ export default function RegistrationLinkPage() {
         setPendingEvent(eventSlug);
         setStatus('continue');
       } catch (verificationError) {
-        setError(verificationError instanceof Error ? verificationError.message : 'We could not verify this link.');
+        const text = errorMessage(verificationError, 'We could not verify this link.');
+        setError(text);
+        toast.error(text, { title: 'Link unavailable' });
         setStatus('error');
       }
     })();

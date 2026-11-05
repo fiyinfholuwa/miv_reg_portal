@@ -77,7 +77,10 @@ export const fallbackProducts: HubProduct[] = [
   { name: 'Revival T-shirt', price: 13000, image: '/images/merch/revival-tee.jpg', href: '/shop/revival-t-shirt' },
 ];
 
-export const naira = (value: number) => `₦${Math.round(value).toLocaleString('en-NG')}`;
+export const MIV_SITE_URL = 'https://menofissacharvision.com/';
+export const MIV_ABOUT_URL = 'https://menofissacharvision.com/about.html';
+
+export const naira =(value: number) => `₦${Math.round(value).toLocaleString('en-NG')}`;
 
 export function openRegistration(detail: { event?: string; mode?: 'login' }) {
   window.dispatchEvent(new CustomEvent('open-registration-modal', { detail }));

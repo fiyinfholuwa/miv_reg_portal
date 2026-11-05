@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'shop_product_id', 'quantity'])]
+#[Fillable(['user_id', 'shop_product_id', 'color', 'size', 'quantity'])]
 class ShopCartItem extends Model
 {
     protected function casts(): array

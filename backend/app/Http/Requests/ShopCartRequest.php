@@ -15,7 +15,9 @@ class ShopCartRequest extends FormRequest
     {
         return [
             'items' => ['required', 'array'],
-            'items.*.product_id' => ['required', 'integer', 'distinct'],
+            'items.*.product_id' => ['required', 'integer'],
+            'items.*.color' => ['nullable', 'string', 'max:60'],
+            'items.*.size' => ['nullable', 'string', 'max:20'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:20'],
         ];
     }

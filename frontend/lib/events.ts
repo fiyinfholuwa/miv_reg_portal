@@ -18,6 +18,9 @@ export type MivEvent = {
   attendance_options: string[];
   day_options: string[];
   offers_accommodation: boolean;
+  programme: { day: string; sessions: { time: string; title: string; detail?: string }[] }[];
+  stream_url: string | null;
+  publicity: { caption: string; assets: { title: string; image: string }[] };
   is_featured: boolean;
   registration_open: boolean;
 };
@@ -42,6 +45,7 @@ export type AccountUser = {
   state_country: string | null;
   registration_completed: boolean;
   registered_events: string[];
+  has_photo: boolean;
 };
 
 /** Thrown for API errors so callers can show the first field message. */
@@ -106,4 +110,33 @@ export function registerForEvent(slug: string, attendance: { attendance_mode?: s
 /** An event needs the attendance step only when it offers a real choice. */
 export function needsAttendanceStep(event: MivEvent) {
   return event.attendance_options.length > 1 || event.day_options.length > 0 || event.offers_accommodation;
+}
+
+/** Upload the photo used on "I will be attending" cards. */
+export async function uploadPhoto(file: File) {
+  const body = new FormData();
+  body.append('photo', file);
+  let response: Response;
+  try {
+    response = await fetch(apiUrl('/auth/photo'), { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${readSession()}` }, body });
+  } catch {
+    throw new ApiError('We could not reach the server to save your photo.', 0);
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new ApiError(data.errors?.photo?.[0] ?? data.message ?? 'We could not save your photo.', response.status);
+}
+
+/** The saved photo as a same-origin object URL (safe to draw on a canvas), or null. */
+export async function fetchPhotoUrl(): Promise<string | null> {
+  try {
+    const response = await fetch(apiUrl('/auth/photo'), { headers: { Authorization: `Bearer ${readSession()}` } });
+    if (!response.ok) return null;
+    return URL.createObjectURL(await response.blob());
+  } catch {
+    return null;
+  }
+}
+
+export function eventPageUrl(slug: string) {
+  return typeof window === 'undefined' ? `/events/${slug}` : `${window.location.origin}/events/${slug}`;
 }

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Mail\RegistrationOtpMail;
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Models\Testimonial;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -114,6 +115,39 @@ class EventRegistrationApiTest extends TestCase
             ->assertJsonPath('events.0.day_options.0', 'Tue 19');
 
         $this->getJson('/api/events/does-not-exist')->assertNotFound();
+    }
+
+    public function test_event_payload_includes_programme_and_a_default_publicity_kit(): void
+    {
+        $this->getJson('/api/events/imlc')
+            ->assertOk()
+            ->assertJsonPath('event.programme.0.day', 'Sat 23')
+            ->assertJsonPath('event.publicity.assets.0.title', 'Official flyer');
+
+        $this->getJson('/api/events/bbr')
+            ->assertOk()
+            ->assertJsonPath('event.programme', [])
+            ->assertJsonPath('event.publicity.assets.0.image', '/images/photos/lp-about-2.webp');
+    }
+
+    public function test_testimonies_are_filed_under_a_registered_event_and_listed_per_event(): void
+    {
+        $user = $this->onboardedUser();
+        $token = $user->createToken('test')->plainTextToken;
+        $this->withToken($token)->postJson('/api/auth/events/bbr/register', ['attendance_mode' => 'Online'])->assertCreated();
+
+        $this->withToken($token)->postJson('/api/auth/testimonials', ['type' => 'Write', 'content' => 'Bethel renewed my prayer life.', 'event' => 'bbr'])
+            ->assertCreated();
+        $this->assertDatabaseHas('testimonials', ['user_id' => $user->id, 'event_id' => Event::where('slug', 'bbr')->value('id')]);
+
+        $this->withToken($token)->postJson('/api/auth/testimonials', ['type' => 'Write', 'content' => 'I was never registered here.', 'event' => 'awg'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['event' => 'You can only share a testimony for an event you registered for.']);
+
+        Testimonial::query()->update(['status' => 'published']);
+
+        $this->withToken($token)->getJson('/api/auth/testimonials?event=bbr')->assertOk()->assertJsonCount(1, 'testimonials')->assertJsonPath('testimonials.0.meta', 'BBR');
+        $this->withToken($token)->getJson('/api/auth/testimonials?event=imlc')->assertOk()->assertJsonCount(0, 'testimonials');
     }
 
     public function test_registering_for_an_event_returns_401_without_a_token(): void

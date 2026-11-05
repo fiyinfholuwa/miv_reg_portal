@@ -1,100 +1,74 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import RegistrationModal from './conference/RegistrationModal';
-import { Mark } from './conference/ConferenceAtoms';
-import { merch } from './conference/conference-data';
+import { HubFooter, HubNav } from './landing/HubChrome';
+import { naira } from './landing/hub-data';
+import { Swatch } from './shop/VariantPicker';
+import { useShopCart } from './shop/useShopCart';
 import { apiUrl } from '../lib/api';
-import { fetchAccountCart, mergeCart, persistAccountCart, productSlug, readCart, type Cart } from '../lib/shop';
+import { cartKey, cartPayload, colorHex, lineNeedsOptions, productImage, productSizes, productSlug, variantLabel, type CartLine } from '../lib/shop';
+import { errorMessage, toast } from '../lib/toast';
 
-type Product = { id?: number; name: string; description?: string | null; price: number; image?: string | null; stock?: number | null };
-
-const fallbackProducts: Product[] = merch.map((item, index) => ({
-  ...item,
-  id: index + 1,
-  price: Number(item.price.replace(/[^0-9]/g, '')),
-  description: 'Official Jan. Conf 2027 merchandise.',
-}));
+const steps = ['Cart', 'Sign in', 'Pay', 'Collect'];
 
 export default function CartPage() {
-  const [products, setProducts] = useState<Product[]>(fallbackProducts);
-  const [cart, setCart] = useState<Cart>({});
-  const [notice, setNotice] = useState('');
+  const { setCart, lines, total, count, quantityOf } = useShopCart();
   const [checkingOut, setCheckingOut] = useState(false);
-  const [cartLoaded, setCartLoaded] = useState(false);
-  const [accountCartLoaded, setAccountCartLoaded] = useState(false);
-  const [productsLoaded, setProductsLoaded] = useState(false);
-  const [accountId, setAccountId] = useState<number | null>(null);
+  const incomplete = lines.filter(lineNeedsOptions);
 
-  useEffect(() => {
-    const localCart = readCart(window.localStorage.getItem('jan-conf-cart'));
-    setCart(localCart);
-    setCartLoaded(true);
-
-    void fetch(apiUrl('/shop/products'))
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Shop unavailable')))
-      .then((data) => {
-        if (!Array.isArray(data.products) || !data.products.length) return;
-
-        setProducts((current) => {
-          const merged = new Map(current.map((product) => [product.name, product]));
-          data.products.forEach((product: Product) => merged.set(product.name, product));
-          return Array.from(merged.values());
-        });
-      })
-      .catch(() => undefined)
-      .finally(() => setProductsLoaded(true));
-
-    void fetchAccountCart()
-      .then((accountCart) => {
-        if (!accountCart) return;
-        setAccountId(accountCart.accountId);
-        const owner = window.localStorage.getItem('jan-conf-cart-owner');
-        setCart(owner === String(accountCart.accountId) ? accountCart.cart : mergeCart(accountCart.cart, localCart));
-      })
-      .finally(() => setAccountCartLoaded(true));
-  }, []);
-
-  useEffect(() => {
-    if (cartLoaded) window.localStorage.setItem('jan-conf-cart', JSON.stringify(cart));
-  }, [cart, cartLoaded]);
-
-  useEffect(() => {
-    if (!cartLoaded || !accountCartLoaded || !productsLoaded || !accountId) return;
-    void persistAccountCart(cart, products, accountId);
-  }, [cart, products, cartLoaded, accountCartLoaded, productsLoaded, accountId]);
-
-  const cartItems = products.filter((product) => (cart[product.name] || 0) > 0);
-  const total = useMemo(() => cartItems.reduce((sum, product) => sum + product.price * (cart[product.name] || 0), 0), [cartItems, cart]);
-  const quantity = Object.values(cart).reduce((sum, value) => sum + value, 0);
-
-  const updateQuantity = (product: Product, next: number) => {
-    const normalized = Math.floor(Number(next));
+  const setQuantity = (line: CartLine, next: number) => {
+    const quantity = Math.floor(Number(next));
+    const stock = line.product.stock;
+    const otherLines = quantityOf(line.product) - line.quantity;
+    if (stock != null && quantity > stock - otherLines) {
+      toast.warning(`Only ${stock} ${line.product.name} in stock across all colours and sizes.`, { title: 'Not enough stock' });
+    }
     setCart((current) => {
       const updated = { ...current };
-      if (!Number.isFinite(normalized) || normalized <= 0) delete updated[product.name];
-      else updated[product.name] = product.stock ? Math.min(normalized, product.stock) : normalized;
+      if (!Number.isFinite(quantity) || quantity <= 0) delete updated[line.key];
+      else updated[line.key] = Math.min(quantity, 20, stock != null ? Math.max(1, stock - otherLines) : 20);
       return updated;
     });
   };
 
+  const changeSize = (line: CartLine, size: string) => {
+    const key = cartKey(line.product.name, line.color, size);
+    if (key === line.key) return;
+    setCart((current) => {
+      const updated = { ...current };
+      delete updated[line.key];
+      updated[key] = (updated[key] || 0) + line.quantity;
+      return updated;
+    });
+  };
+
+  const remove = (line: CartLine) => {
+    setCart((current) => { const updated = { ...current }; delete updated[line.key]; return updated; });
+    toast.info(`${line.product.name} removed from your cart.`, { title: 'Removed' });
+  };
+
   const checkout = async () => {
     if (!total) return;
+    if (incomplete.length) {
+      toast.warning(`Choose a colour and size for ${incomplete[0].product.name} before checkout.`, { title: 'Options needed' });
+      return;
+    }
     if (!window.localStorage.getItem('jan-conf-session')) {
-      setNotice('Please sign in or register before checkout.');
+      toast.warning('Please sign in or register before checkout.', { title: 'Sign in to check out' });
       window.dispatchEvent(new CustomEvent('open-registration-modal', { detail: { returnTo: '/shop/cart' } }));
       return;
     }
 
-    const items = cartItems.filter((product) => product.id).map((product) => ({ product_id: product.id, quantity: cart[product.name] }));
+    const items = cartPayload(lines);
     if (!items.length) {
-      setNotice('Refresh the cart so we can confirm the products.');
+      toast.warning('Refresh the cart so we can confirm the products.');
       return;
     }
 
     setCheckingOut(true);
-    setNotice('Opening secure payment…');
+    toast.info('Opening secure payment…', { id: 'checkout' });
     try {
       const response = await fetch(apiUrl('/shop/orders/initialize'), {
         method: 'POST',
@@ -106,71 +80,94 @@ export default function CartPage() {
         body: JSON.stringify({ items }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || data.errors?.payment?.[0] || data.errors?.items?.[0] || 'Could not start payment.');
+      if (!response.ok) throw new Error(data.errors?.items?.[0] || data.errors?.payment?.[0] || data.message || 'Could not start payment.');
       window.location.assign(data.authorization_url);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Could not start payment.');
+      toast.error(errorMessage(error, 'Could not start payment.'), { id: 'checkout', title: 'Payment could not start' });
       setCheckingOut(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#f6f2e9] text-ink">
+    <main className="miv-hub">
       <RegistrationModal />
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-ink/95 py-3 text-white shadow-lg backdrop-blur-md sm:py-4">
-        <div className="container-shell flex items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-2 sm:gap-3" aria-label="Jan Conf home">
-            <Mark />
-            <span className="font-display text-lg uppercase leading-none tracking-wide sm:text-xl">Jan Conf<br /><span className="text-coral">2027</span></span>
-          </Link>
-          <Link href="/shop" className="rounded-full border border-white/25 px-4 py-3 text-xs font-bold uppercase tracking-[.08em]">Keep shopping</Link>
-        </div>
-      </header>
+      <div className="p-2.5 sm:p-4"><HubNav variant="solid" /></div>
 
-      <section className="container-shell py-16 sm:py-24">
-        <Link href="/shop" className="text-sm font-bold text-coral">← Keep shopping</Link>
+      <section className="px-5 py-10 sm:px-10 sm:py-14 lg:px-[72px]">
+        <Link href="/shop" className="text-sm font-bold text-[#a82e26] hover:text-[#8c1f1c]">← Keep shopping</Link>
+
+        <ol className="m-0 mt-6 flex list-none flex-wrap items-center gap-2 p-0 text-xs font-bold sm:text-sm" aria-label="Checkout steps">
+          {steps.map((step, index) => (
+            <li key={step} className="flex items-center gap-2">
+              <span className={`flex items-center gap-2 rounded-full px-3 py-1.5 ${index === 0 ? 'bg-[#00203f] text-white' : 'bg-white text-[#6b7280] ring-1 ring-[#e4e7ec]'}`} aria-current={index === 0 ? 'step' : undefined}>
+                <span className={`grid h-5 w-5 place-items-center rounded-full text-[11px] ${index === 0 ? 'bg-white text-[#00203f]' : 'bg-[#f4f5f7]'}`}>{index + 1}</span>{step}
+              </span>
+              {index < steps.length - 1 && <span className="h-px w-4 bg-[#c9ced6]" aria-hidden="true" />}
+            </li>
+          ))}
+        </ol>
+
         <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_360px]">
           <div>
             <div className="flex items-end justify-between gap-4">
               <div>
-                <p className="eyebrow">Ready for collection</p>
-                <h1 className="section-title mt-3">Your<br /><span className="text-coral">cart.</span></h1>
+                <span className="text-sm font-semibold text-[#a82e26] sm:text-[15px]">Ready for collection</span>
+                <h1 className="m-0 mt-3 text-[36px] font-semibold leading-[1.02] tracking-[-0.025em] text-[#0c0d10] sm:text-[56px]">Your cart.</h1>
               </div>
-              <span className="text-sm font-bold text-ink/50">{quantity} item{quantity === 1 ? '' : 's'}</span>
+              <span className="text-sm font-bold text-[#6b7280]">{count} item{count === 1 ? '' : 's'}</span>
             </div>
 
             <div className="mt-8 grid gap-4">
-              {cartItems.length === 0 && (
-                <div className="rounded-[1.5rem] bg-white p-8 text-center shadow-sm">
-                  <p className="text-ink/60">Your cart is empty.</p>
-                  <Link href="/shop" className="button-primary mt-5">Keep shopping</Link>
+              {lines.length === 0 && (
+                <div className="flex flex-col items-center gap-4 rounded-[22px] border border-dashed border-[#c9ced6] bg-white p-10 text-center">
+                  <p className="m-0 text-lg font-semibold text-[#0c0d10]">Your cart is empty.</p>
+                  <p className="m-0 text-sm text-[#4d5460]">Pick a colour and size from the Revival collection to get started.</p>
+                  <Link href="/shop" className="rounded-full bg-[#00203f] px-7 py-[15px] text-[15px] font-bold text-white">Browse the shop</Link>
                 </div>
               )}
 
-              {cartItems.map((product) => {
-                const itemQuantity = cart[product.name] || 0;
-                const slug = productSlug(product.name);
+              {lines.map((line) => {
+                const { product } = line;
+                const href = `/shop/${productSlug(product.name)}${line.color ? `?color=${encodeURIComponent(line.color)}` : ''}`;
+                const sizes = productSizes(product);
+                const hex = line.color ? colorHex(product, line.color) : undefined;
+                const needsOptions = lineNeedsOptions(line);
 
                 return (
-                  <article key={product.name} className="flex gap-4 rounded-[1.5rem] border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
-                    <Link href={`/shop/${slug}`} className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-[#e7edf3] sm:h-32 sm:w-32">
-                      <img src={product.image || '/images/miv-logo.png'} alt={product.name} className="h-full w-full object-cover" />
+                  <article key={line.key} className={`flex gap-4 rounded-[22px] border bg-white p-4 sm:p-5 ${needsOptions ? 'border-[#e8c48a]' : 'border-[#e4e7ec]'}`}>
+                    <Link href={href} className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-[#f4eddc] sm:h-32 sm:w-32">
+                      <img src={productImage(product, line.color)} alt={product.name} className="h-full w-full object-cover" />
                     </Link>
-                    <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 flex-1 flex-col">
                       <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <Link href={`/shop/${slug}`} className="font-display text-2xl uppercase leading-none hover:text-coral">{product.name}</Link>
-                          <p className="mt-2 text-sm text-ink/55">₦{product.price.toLocaleString()} each</p>
+                        <div className="min-w-0">
+                          <Link href={href} className="text-lg font-semibold leading-tight text-[#0c0d10] hover:text-[#a82e26]">{product.name}</Link>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[#4d5460]">
+                            {line.color && <span className="flex items-center gap-1.5 rounded-full bg-[#f4f5f7] px-2.5 py-1 font-semibold text-[#22262e]">{hex && <Swatch hex={hex} size={12} />}{line.color}</span>}
+                            {sizes.length > 0 && (
+                              <label className="flex items-center gap-1.5 rounded-full bg-[#f4f5f7] py-1 pl-2.5 pr-1 font-semibold text-[#22262e]">
+                                Size
+                                <select value={sizes.includes(line.size) ? line.size : ''} onChange={(event) => changeSize(line, event.target.value)} className="rounded-full border-0 bg-white px-2 py-0.5 text-sm font-bold outline-none" aria-label={`Size for ${product.name}`}>
+                                  {!sizes.includes(line.size) && <option value="" disabled>Choose</option>}
+                                  {sizes.map((size) => <option key={size}>{size}</option>)}
+                                </select>
+                              </label>
+                            )}
+                            <span>{naira(product.price)} each</span>
+                          </div>
+                          {needsOptions && <Link href={href} className="mt-2 inline-block text-sm font-bold text-[#b7791f]">Choose colour and size →</Link>}
                         </div>
-                        <button type="button" onClick={() => updateQuantity(product, 0)} className="text-xs font-bold uppercase text-ink/45 hover:text-coral">Remove</button>
+                        <button type="button" onClick={() => remove(line)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#6b7280] transition hover:bg-[#fff0ee] hover:text-[#a82e26]" aria-label={`Remove ${product.name}`}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>
+                        </button>
                       </div>
-                      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 rounded-full border border-ink/10 p-1">
-                          <button type="button" onClick={() => updateQuantity(product, itemQuantity - 1)} className="grid h-8 w-8 place-items-center rounded-full border border-ink/10 text-lg leading-none hover:bg-cream" aria-label={`Decrease ${product.name}`}>−</button>
-                          <input type="number" min="1" max={product.stock || undefined} value={itemQuantity} onChange={(event) => updateQuantity(product, Number(event.target.value))} className="w-12 border-0 bg-transparent text-center text-sm font-bold outline-none" aria-label={`Quantity for ${product.name}`} />
-                          <button type="button" onClick={() => updateQuantity(product, itemQuantity + 1)} className="grid h-8 w-8 place-items-center rounded-full border border-ink/10 text-lg leading-none hover:bg-cream" aria-label={`Increase ${product.name}`}>+</button>
+                      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-4">
+                        <div className="flex items-center gap-1 rounded-full border border-[#e4e7ec] p-1">
+                          <button type="button" onClick={() => setQuantity(line, line.quantity - 1)} className="grid h-8 w-8 place-items-center rounded-full text-lg leading-none hover:bg-[#f4f5f7]" aria-label={`Decrease ${product.name}`}>−</button>
+                          <span className="w-8 text-center text-sm font-bold tabular-nums">{line.quantity}</span>
+                          <button type="button" onClick={() => setQuantity(line, line.quantity + 1)} className="grid h-8 w-8 place-items-center rounded-full text-lg leading-none hover:bg-[#f4f5f7]" aria-label={`Increase ${product.name}`}>+</button>
                         </div>
-                        <strong>₦{(product.price * itemQuantity).toLocaleString()}</strong>
+                        <strong className="tabular-nums">{naira(product.price * line.quantity)}</strong>
                       </div>
                     </div>
                   </article>
@@ -179,20 +176,24 @@ export default function CartPage() {
             </div>
           </div>
 
-          <aside className="h-fit rounded-[1.5rem] bg-ink p-6 text-white shadow-lg lg:sticky lg:top-28">
-            <p className="eyebrow text-[#ff7565]">Order total</p>
-            <div className="mt-4 flex items-end justify-between gap-3">
-              <span className="text-sm text-sky/70">{quantity} item{quantity === 1 ? '' : 's'}</span>
-              <strong className="font-display text-4xl">₦{total.toLocaleString()}</strong>
+          <aside className="h-fit rounded-[24px] bg-[#001428] p-6 text-[#faf6ec] lg:sticky lg:top-32">
+            <span className="text-sm font-semibold text-[#bcd6ec]">Order summary</span>
+            <div className="mt-4 grid gap-2 border-b border-white/10 pb-4 text-sm">
+              {lines.length === 0 && <span className="text-[#bcd6ec]">No items yet.</span>}
+              {lines.map((line) => <div key={line.key} className="flex justify-between gap-3"><span className="min-w-0 truncate text-[#dceaf5]">{line.product.name}{variantLabel(line) ? ` · ${variantLabel(line)}` : ''} × {line.quantity}</span><span className="shrink-0 tabular-nums">{naira(line.product.price * line.quantity)}</span></div>)}
             </div>
-            <p className="mt-4 text-sm leading-6 text-sky/70">Payment is handled securely by Paystack. Collect your order at the conference store.</p>
-            <button type="button" disabled={!total || checkingOut} onClick={() => void checkout()} className="mt-6 w-full rounded-full bg-white px-5 py-4 text-sm font-bold text-ink disabled:cursor-not-allowed disabled:opacity-40">
-              {checkingOut ? 'Opening payment…' : 'Proceed to checkout'}
+            <div className="mt-4 flex items-end justify-between gap-3">
+              <span className="text-sm text-[#bcd6ec]">Total</span>
+              <strong className="text-4xl font-semibold tabular-nums">{naira(total)}</strong>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-[#bcd6ec]">Payment is handled securely by Paystack. Collect your order at the conference store with your pickup barcode.</p>
+            <button type="button" disabled={!total || checkingOut} onClick={() => void checkout()} className="mt-6 w-full rounded-full bg-[#a82e26] px-5 py-4 text-[15px] font-bold text-white transition hover:bg-[#8c1f1c] disabled:cursor-not-allowed disabled:opacity-40">
+              {checkingOut ? 'Opening payment…' : `Checkout · ${naira(total)}`}
             </button>
-            {notice && <p className="mt-4 rounded-xl bg-white/10 p-3 text-sm leading-5 text-[#ffcf96]" role="status">{notice}</p>}
           </aside>
         </div>
       </section>
+      <HubFooter />
     </main>
   );
 }

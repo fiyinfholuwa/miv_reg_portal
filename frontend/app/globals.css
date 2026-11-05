@@ -62,7 +62,26 @@ textarea {
   line-height: 1.5;
   overflow-x: clip;
 }
-.miv-hub h1, .miv-hub h2, .miv-hub h3 { font-family: inherit; }
+/* Barlow for hub overlays (menu, partner form) without .miv-hub's page
+   background, so the page underneath stays visible. */
+.miv-hub-font { font-family: 'Barlow', system-ui, -apple-system, sans-serif; line-height: 1.5; }
+.miv-hub h1, .miv-hub h2, .miv-hub h3, .miv-hub-font h2 { font-family: inherit; }
+
+/* Horizontal scrollers (tab bars) without a visible scrollbar. */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Toasts (components/Toaster.tsx) */
+@keyframes miv-toast-in { from { opacity: 0; transform: translateX(24px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes miv-toast-progress { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes miv-shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.miv-shake { animation: miv-shake .4s ease-in-out; }
+@keyframes miv-fade { from { opacity: .35; } to { opacity: 1; } }
+.miv-fade { animation: miv-fade .3s ease-out; }
+@keyframes miv-sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+.miv-sheet { animation: miv-sheet-in .28s cubic-bezier(.2, .8, .2, 1); }
+.miv-toast { animation: miv-toast-in .28s cubic-bezier(.2, .8, .2, 1); }
+.miv-toast-progress { animation-name: miv-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
 .miv-hub a:focus-visible, .miv-hub button:focus-visible, .miv-hub select:focus-visible {
   outline: 3px solid rgba(29, 114, 186, .55);
   outline-offset: 2px;
