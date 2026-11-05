@@ -4,14 +4,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\EventRegistrationRequest;
+use App\Http\Requests\JoinTeamRequest;
 use App\Models\Event;
 use App\Services\EventService;
+use App\Services\TeamService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class EventController extends Controller
 {
-    public function __construct(private readonly EventService $eventService) {}
+    public function __construct(
+        private readonly EventService $eventService,
+        private readonly TeamService $teamService,
+    ) {}
 
     public function index(): JsonResponse
     {
@@ -26,6 +31,16 @@ class EventController extends Controller
     public function myEvents(Request $request): JsonResponse
     {
         return response()->json(['registrations' => $this->eventService->registrationsFor($request->user())]);
+    }
+
+    public function joinTeam(JoinTeamRequest $request, Event $event): JsonResponse
+    {
+        return response()->json($this->teamService->join($request->user(), $event, $request->validated('code')));
+    }
+
+    public function leaveTeam(Request $request, Event $event): JsonResponse
+    {
+        return response()->json($this->teamService->leave($request->user(), $event));
     }
 
     public function register(EventRegistrationRequest $request, Event $event): JsonResponse

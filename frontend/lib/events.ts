@@ -40,8 +40,12 @@ export type EventRegistration = {
   attendance_days: string[];
   needs_accommodation: boolean;
   registered_at: string | null;
+  checked_in_at?: string | null;
+  team?: DelegateTeam | null;
   event: MivEvent;
 };
+
+export type DelegateTeam = { name: string; code: string; leader: string | null; leader_phone: string | null; members_count: number; notes: string | null };
 
 export type AccountUser = {
   id: number;

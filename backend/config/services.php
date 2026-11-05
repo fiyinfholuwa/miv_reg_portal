@@ -10,6 +10,8 @@ return [
         'from_address' => env('ELASTICEMAIL_FROM_ADDRESS', 'conference@menofissacharvision.com'),
         'from_name' => env('ELASTICEMAIL_FROM_NAME', 'Men of Issachar Vision'),
         'timeout' => (int) env('ELASTICEMAIL_TIMEOUT', 15),
+        // Emails one address can receive per minute (codes, notifications). Broadcasts are exempt.
+        'per_recipient_per_minute' => (int) env('ELASTICEMAIL_PER_RECIPIENT_PER_MINUTE', 2),
     ],
     'paystack' => [
         'secret_key' => env('PAYSTACK_SECRET_KEY'),

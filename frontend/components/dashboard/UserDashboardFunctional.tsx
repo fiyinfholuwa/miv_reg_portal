@@ -191,10 +191,38 @@ function openRegistration(slug: string) {
   window.dispatchEvent(new CustomEvent('open-registration-modal', { detail: { event: slug } }));
 }
 
+type Announcement = { id: number; title: string; body: string; scheduled_at: string | null; created_at: string | null };
+
+/** Admin broadcasts, newest first. Collapsed to the latest two. */
+function Announcements() {
+  const [items, setItems] = useState<Announcement[]>([]);
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => { void api('/auth/broadcasts').then((data) => setItems(data.broadcasts ?? [])).catch(() => undefined); }, []);
+  if (items.length === 0) return null;
+  const shown = expanded ? items : items.slice(0, 2);
+  return (
+    <section className="rounded-[1.5rem] border border-ink/10 bg-white p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[.12em] text-ink/45"><span className="h-2 w-2 rounded-full bg-coral" />Announcements</h2>
+        {items.length > 2 && <button type="button" onClick={() => setExpanded((value) => !value)} className="text-xs font-bold text-[#1469a9]">{expanded ? 'Show less' : `View all ${items.length}`}</button>}
+      </div>
+      <ul className="m-0 mt-3 grid list-none gap-2 p-0 lg:grid-cols-2">
+        {shown.map((item) => (
+          <li key={item.id} className="rounded-xl bg-[#f6f2e9] p-3.5">
+            <div className="flex items-baseline justify-between gap-3"><strong className="text-sm">{item.title}</strong><span className="shrink-0 text-[11px] text-ink/45">{new Date(item.scheduled_at ?? item.created_at ?? Date.now()).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</span></div>
+            <p className={`mt-1 whitespace-pre-line text-sm leading-6 text-ink/70 ${expanded ? '' : 'line-clamp-3'}`}>{item.body}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function MyEvents({ registrations, joinable, go }: { registrations: EventRegistration[]; joinable: MivEvent[]; go: (href: string) => void }) {
   const next = registrations.find((registration) => registration.event.starts_at && new Date(registration.event.ends_at ?? registration.event.starts_at).getTime() > Date.now());
   return (
     <div className="grid gap-7">
+      <Announcements />
       {next?.event.starts_at && (
         <section className="relative overflow-hidden rounded-[1.5rem] bg-[#03284a] p-5 text-white sm:p-7">
           {next.event.image && <img src={next.event.image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />}

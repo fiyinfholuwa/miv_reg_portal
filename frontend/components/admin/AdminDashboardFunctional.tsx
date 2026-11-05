@@ -1,26 +1,37 @@
 'use client';
 
-import { STANDARD_SIZES } from '../../lib/shop';
 import { errorMessage, toast } from '../../lib/toast';
 import { FormEvent, useEffect, useState } from 'react';
 import { API_URL } from '../../lib/api';
 import { api } from './adminApi';
 import EventContentManager from './EventContentManager';
+import EventsManager from './EventsManager';
+import LandingContentManager from './LandingContentManager';
+import { RegistrantsView, TeamsView } from './PeopleViews';
+import { BroadcastsView, CheckInView, PartnerEnquiriesView, TestimoniesView } from './OperationsViews';
+import { AdminOrdersView, ShopProductsView } from './ShopAdminViews';
+import { SettingsView } from './SettingsView';
+import { AdminIcon, type AdminIconName } from './AdminIcons';
 
 
-type AdminPage = 'Overview' | 'Registrants' | 'Approvals' | 'Teams' | 'Broadcasts' | 'Testimonies' | 'Event content' | 'Shop products' | 'Partner enquiries' | 'Store orders' | 'Check-in & meals' | 'Settings';
+type AdminPage = 'Overview' | 'Registrants' | 'Approvals' | 'Teams' | 'Events' | 'Event content' | 'Broadcasts' | 'Testimonies' | 'Check-in & meals' | 'Landing page' | 'Partner enquiries' | 'Shop products' | 'Store orders' | 'Settings';
 type Overview = { registered: number; onsite: number; online: number; awaiting_approval: number; daily: { label: string; value: number }[]; capacity: { label: string; value: number }[] };
-type Registrant = { id: number; name: string; email: string; role: string | null; attendance_mode: string | null; approval_status: string; ticket_code: string | null; created_at: string | null };
-type Testimonial = { id: number; name: string; email: string; content: string; topic: string | null; event: string | null; status: string; created_at: string | null };
-type Broadcast = { id: number; title: string; body: string; scheduled_at: string | null; status: string };
-type ShopProduct = { id: number; name: string; description: string | null; price: number; image: string | null; tag: string | null; colors: { name: string; hex: string; image?: string | null }[] | null; sizes: string[] | null; stock: number | null; active: boolean; sort_order: number };
-type PartnerInquiry = { id: number; name: string; email: string; phone: string | null; organization: string | null; message: string; status: 'new' | 'contacted' | 'closed'; created_at: string | null };
 
-const navigation: { label: AdminPage; icon: string }[] = [
-  { label: 'Overview', icon: '⌂' }, { label: 'Registrants', icon: '◌' }, { label: 'Approvals', icon: '✓' },
-  { label: 'Teams', icon: '♧' }, { label: 'Broadcasts', icon: '◉' }, { label: 'Testimonies', icon: '✦' },
-  { label: 'Event content', icon: '▣' }, { label: 'Shop products', icon: '◈' }, { label: 'Partner enquiries', icon: '✉' }, { label: 'Store orders', icon: '□' }, { label: 'Check-in & meals', icon: '⌁' }, { label: 'Settings', icon: '⚙' },
+const navigation: { group: string; items: { label: AdminPage; icon: AdminIconName }[] }[] = [
+  { group: '', items: [{ label: 'Overview', icon: 'home' }] },
+  { group: 'People', items: [{ label: 'Registrants', icon: 'users' }, { label: 'Approvals', icon: 'check' }, { label: 'Teams', icon: 'team' }] },
+  { group: 'Events', items: [{ label: 'Events', icon: 'calendar' }, { label: 'Event content', icon: 'layers' }, { label: 'Broadcasts', icon: 'megaphone' }, { label: 'Testimonies', icon: 'heart' }, { label: 'Check-in & meals', icon: 'scan' }] },
+  { group: 'Website', items: [{ label: 'Landing page', icon: 'globe' }, { label: 'Partner enquiries', icon: 'mail' }] },
+  { group: 'Shop', items: [{ label: 'Shop products', icon: 'tag' }, { label: 'Store orders', icon: 'bag' }] },
+  { group: '', items: [{ label: 'Settings', icon: 'settings' }] },
 ];
+const PAGE_HINTS: Partial<Record<AdminPage, string>> = {
+  Events: 'Create events and choose what shows on the website.',
+  'Event content': 'Programme, livestream, publicity kit and hotels for each event dashboard.',
+  'Landing page': 'Everything on the public home page.',
+  Broadcasts: 'Announcements appear on every delegate’s dashboard.',
+  'Store orders': 'Paid orders and what to hand over at the store.',
+};
 
 
 export default function AdminDashboardFunctional() {
@@ -29,30 +40,14 @@ export default function AdminDashboardFunctional() {
   const [loading, setLoading] = useState(true);
   const [loginRequired, setLoginRequired] = useState(false);
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [registrants, setRegistrants] = useState<Registrant[]>([]);
-  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
-  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
-  const [products, setProducts] = useState<ShopProduct[]>([]);
-  const [partnerInquiries, setPartnerInquiries] = useState<PartnerInquiry[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [summary, people, stories, notices, shop, partnerships] = await Promise.all([
-        api('/admin/overview'),
-        api('/admin/registrants'),
-        api('/admin/testimonials'),
-        api('/admin/broadcasts'),
-        api('/admin/shop/products'),
-        api('/admin/partner-inquiries'),
-      ]);
-      setOverview(summary);
-      setRegistrants(people.registrants);
-      setTestimonials(stories.testimonials);
-      setBroadcasts(notices.broadcasts);
-      setProducts(shop.products);
-      setPartnerInquiries(partnerships.inquiries);
+      setOverview(await api('/admin/overview'));
       setLoginRequired(false);
+      setRefreshKey((key) => key + 1);
     } catch (loadError) {
       if (String(loadError).toLowerCase().includes('unauthorized') || String(loadError).toLowerCase().includes('admin access')) setLoginRequired(true);
       else toast.error(errorMessage(loadError, 'Could not load the admin dashboard.'));
@@ -81,33 +76,67 @@ export default function AdminDashboardFunctional() {
     setMobileNavOpen(false);
   };
 
-  const reviewRegistrant = async (id: number, status: 'approved' | 'rejected') => {
-    await api('/admin/registrants/' + id + '/review', { method: 'PATCH', body: JSON.stringify({ status }) });
-    await load();
-  };
 
-  const reviewTestimonial = async (id: number, status: 'approved' | 'rejected') => {
-    try {
-      await api('/admin/testimonials/' + id + '/review', { method: 'PATCH', body: JSON.stringify({ status }) });
-      toast.success(status === 'approved' ? 'Testimony published.' : 'Testimony declined.');
-      await load();
-    } catch (error) { toast.error(errorMessage(error, 'Could not review the testimony.')); }
-  };
 
-  const reviewPartnerInquiry = async (id: number, status: PartnerInquiry['status']) => {
-    await api('/admin/partner-inquiries/' + id + '/review', { method: 'PATCH', body: JSON.stringify({ status }) });
-    await load();
-  };
 
   if (loginRequired) return <AdminLogin onLoggedIn={() => { setLoginRequired(false); void load(); }} />;
   if (loading || !overview) return <main className="grid min-h-screen place-items-center bg-cream text-sm font-bold text-[#0b4779]">Loading admin dashboard…</main>;
 
-  return <main className="min-h-screen bg-cream text-ink"><div className="flex min-h-screen w-full overflow-hidden"><aside className="hidden min-h-screen w-[295px] shrink-0 bg-[#001a2d] p-5 text-white lg:flex lg:flex-col"><Brand /><AdminNav active={active} select={select} /><button type="button" onClick={logout} className="mt-auto flex items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold text-[#b9cee1] hover:bg-white/10"><span>↪</span>Log out</button></aside><div className="min-w-0 flex-1"><header className="flex items-center justify-between border-b border-ink/10 bg-cream px-5 py-4 lg:hidden"><Brand /><button type="button" onClick={() => setMobileNavOpen((open) => !open)} className="grid h-11 w-11 place-items-center rounded-xl bg-ink text-xl text-white">{mobileNavOpen ? '×' : '☰'}</button></header>{mobileNavOpen && <div className="border-b border-white/10 bg-[#001a2d] p-4 lg:hidden"><AdminNav active={active} select={select} /><button type="button" onClick={logout} className="mt-3 w-full border-t border-white/10 px-4 pt-4 text-left text-sm font-bold text-[#b9cee1]">↪ Log out</button></div>}<div className="border-b border-ink/10 bg-[#e8edf3] px-5 py-2 text-xs font-medium text-ink/50 sm:px-8">Live admin operations · connected to Laravel</div><section className="p-5 sm:p-8 lg:p-10"><div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-semibold text-ink/50">Conference operations</p><h1 className="page-title mt-1">{active}</h1></div><button type="button" onClick={() => void load()} className="rounded-full border-2 border-ink/15 bg-white px-5 py-3 text-sm font-bold">Refresh</button></div>{active === 'Overview' && <OverviewView overview={overview} select={select} />}{active === 'Registrants' && <RegistrantView people={registrants} onReview={reviewRegistrant} />}{active === 'Approvals' && <RegistrantView people={registrants.filter((person) => person.approval_status === 'pending')} onReview={reviewRegistrant} empty="No registrations are waiting for approval." />}{active === 'Testimonies' && <TestimonialView items={testimonials} onReview={reviewTestimonial} />}{active === 'Broadcasts' && <BroadcastView items={broadcasts} onCreated={load} />}{active === 'Shop products' && <ShopProductsView items={products} onSaved={load} />}{active === 'Partner enquiries' && <PartnerInquiryView items={partnerInquiries} onReview={reviewPartnerInquiry} />}{active === 'Teams' && <InfoView title="Teams" text="Team assignment is ready for committee review. Use the registrants list to approve delegates and group them after their profiles are complete." items={['Assign team codes', 'View team leaders', 'Export team roster']} />}{active === 'Event content' && <EventContentManager />}{active === 'Store orders' && <InfoView title="Store orders" text="Orders are tracked here for collection at the conference venue." items={['Pending collection', 'Paid orders', 'Collected orders']} />}{active === 'Check-in & meals' && <InfoView title="Check-in & meals" text="Use the registrant ticket code at the print desk and meal points. The backend ticket code is shown in the registrants list." items={['Print desk queue', 'Meal redemptions', 'Badge activity']} />}{active === 'Settings' && <InfoView title="Settings" text="Conference configuration is controlled by the Laravel environment and admin account settings." items={['Registration capacity', 'Email delivery', 'Admin account']} />}</section></div></div></main>;
+  return (
+    <main className="flex h-dvh overflow-hidden bg-cream text-ink">
+      {/* Sidebar: fixed height, never scrolls on a normal screen. */}
+      <aside className="hidden h-full w-[272px] shrink-0 flex-col bg-[#001a2d] px-4 py-5 text-white lg:flex">
+        <Brand />
+        <AdminNav active={active} select={select} />
+        <button type="button" onClick={logout} className="mt-2 flex shrink-0 items-center gap-3 rounded-xl px-3 py-2 text-left text-[15px] font-semibold text-[#c6d7e6] hover:bg-white/10 hover:text-white"><AdminIcon name="logout" size={21} className="text-[#7f9ab2]" />Log out</button>
+      </aside>
+      <div className="flex h-full min-w-0 flex-1 flex-col">
+        {/* Top bar: stays put while the page scrolls. */}
+        <header className="z-30 flex shrink-0 items-center gap-3 border-b border-ink/10 bg-cream/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
+          <button type="button" onClick={() => setMobileNavOpen(true)} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#001a2d] text-lg text-white lg:hidden" aria-label="Open menu">☰</button>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-xl font-bold leading-tight text-[#03284a] sm:text-2xl">{active}</h1>
+            <p className="hidden truncate text-xs text-ink/50 sm:block">{PAGE_HINTS[active] ?? 'Conference operations · connected to Laravel'}</p>
+          </div>
+          <a href="/" target="_blank" rel="noreferrer" className="hidden rounded-full border border-ink/15 bg-white px-4 py-2 text-xs font-bold sm:inline-flex">View site ↗</a>
+          <button type="button" onClick={() => void load()} className="rounded-full border border-ink/15 bg-white px-4 py-2 text-xs font-bold">Refresh</button>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <section className="p-4 sm:p-6 lg:p-8"><div key={`${active}-${refreshKey}`}>
+            {active === 'Overview' && <OverviewView overview={overview} select={select} />}
+            {active === 'Registrants' && <RegistrantsView />}
+            {active === 'Approvals' && <RegistrantsView approvals />}
+            {active === 'Teams' && <TeamsView />}
+            {active === 'Events' && <EventsManager onManageContent={() => select('Event content')} />}
+            {active === 'Event content' && <EventContentManager />}
+            {active === 'Broadcasts' && <BroadcastsView />}
+            {active === 'Testimonies' && <TestimoniesView />}
+            {active === 'Check-in & meals' && <CheckInView />}
+            {active === 'Landing page' && <LandingContentManager />}
+            {active === 'Partner enquiries' && <PartnerEnquiriesView />}
+            {active === 'Shop products' && <ShopProductsView />}
+            {active === 'Store orders' && <AdminOrdersView />}
+            {active === 'Settings' && <SettingsView />}
+          </div></section>
+        </div>
+      </div>
+
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-50 bg-[#001428]/60 lg:hidden" onClick={() => setMobileNavOpen(false)}>
+          <aside className="flex h-full w-[min(86vw,300px)] flex-col bg-[#001a2d] px-4 py-5 text-white" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between"><Brand /><button type="button" onClick={() => setMobileNavOpen(false)} className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-lg" aria-label="Close menu">×</button></div>
+            <AdminNav active={active} select={select} />
+            <button type="button" onClick={logout} className="mt-2 flex shrink-0 items-center gap-3 rounded-xl px-3 py-2 text-left text-[15px] font-semibold text-[#c6d7e6] hover:bg-white/10 hover:text-white"><AdminIcon name="logout" size={21} className="text-[#7f9ab2]" />Log out</button>
+          </aside>
+        </div>
+      )}
+    </main>
+  );
 }
 
 function AdminLogin({ onLoggedIn }: { onLoggedIn: () => void }) {
-  const [email, setEmail] = useState('admin@janconf.test');
-  const [password, setPassword] = useState('ChangeThisAdminPassword!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setSubmitting(true);    try {
@@ -121,89 +150,19 @@ function AdminLogin({ onLoggedIn }: { onLoggedIn: () => void }) {
   return <main className="grid min-h-screen place-items-center bg-[#e8edf3] p-5"><form onSubmit={submit} className="w-full max-w-md rounded-[1.75rem] bg-cream p-7 shadow-2xl sm:p-10"><Brand light /><p className="eyebrow mt-12">Admin access</p><h1 className="page-title mt-3 text-[#03284a]">Welcome back.</h1><p className="type-body-muted mt-5 text-ink/60">Use the seeded administrator account or your configured admin credentials.</p><label className="form-label mt-7 block">Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="form-control" /></label><label className="form-label mt-5 block">Password<input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="form-control" /></label><button disabled={submitting} className="mt-7 w-full rounded-full bg-[#1469a9] px-5 py-4 text-sm font-bold text-white disabled:opacity-60">{submitting ? 'Signing in…' : 'Sign in to admin'}</button></form></main>;
 }
 
-function Brand({ light = false }: { light?: boolean }) { return <div className={`flex items-center gap-3 ${light ? 'text-[#03284a]' : 'text-white'}`}><span className="grid h-10 w-10 place-items-center rounded-full border border-[#9bc4e5]/40 bg-[#0a3557] text-xs font-bold">M</span><span className="font-display text-xl uppercase leading-none">Jan. Conf 2027</span></div>; }
-function AdminNav({ active, select }: { active: AdminPage; select: (page: AdminPage) => void }) { return <nav className="mt-8 grid gap-1" aria-label="Admin navigation">{navigation.map((item) => <button key={item.label} type="button" onClick={() => select(item.label)} className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold ${active === item.label ? 'bg-[#304457] text-white' : 'text-[#b9cee1] hover:bg-white/10'}`}><span className="grid h-6 w-6 place-items-center">{item.icon}</span><span className="flex-1">{item.label}</span></button>)}</nav>; }
+function Brand({ light = false }: { light?: boolean }) { return <div className={`flex items-center gap-3 ${light ? 'text-[#03284a]' : 'text-white'}`}><span className="grid h-10 w-10 place-items-center rounded-full border border-[#9bc4e5]/40 bg-[#0a3557] text-xs font-bold">M</span><span className="font-display text-xl uppercase leading-none">MIV Admin</span></div>; }
+function AdminNav({ active, select }: { active: AdminPage; select: (page: AdminPage) => void }) {
+  return (
+    <nav className="no-scrollbar mt-6 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto" aria-label="Admin navigation">
+      {navigation.map((section, index) => (
+        <div key={index} className={section.group ? 'mt-3' : index > 0 ? 'mt-3' : ''}>
+          {section.group && <p className="mb-1 px-3 text-[11px] font-bold uppercase tracking-[.16em] text-[#6f8aa3]">{section.group}</p>}
+          {section.items.map((item) => <button key={item.label} type="button" onClick={() => select(item.label)} aria-current={active === item.label ? 'page' : undefined} className={`flex w-full items-center gap-3 rounded-xl px-3 py-[7px] text-left text-[15px] font-semibold transition ${active === item.label ? 'bg-[#304457] text-white' : 'text-[#c6d7e6] hover:bg-white/10 hover:text-white'}`}><AdminIcon name={item.icon} size={21} className={active === item.label ? 'text-[#9bc4e5]' : 'text-[#7f9ab2]'} /><span className="flex-1">{item.label}</span></button>)}
+        </div>
+      ))}
+    </nav>
+  );
+}
 function OverviewView({ overview, select }: { overview: Overview; select: (page: AdminPage) => void }) { const max = Math.max(...overview.daily.map((day) => day.value), 1); return <><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Registered" value={overview.registered} detail="Verified accounts" /><Metric label="Onsite" value={overview.onsite} detail="Physical attendance" /><Metric label="Online" value={overview.online} detail="Livestream access" /><Metric label="Awaiting approval" value={overview.awaiting_approval} detail="Needs review" alert /></div><div className="mt-6 grid gap-4 xl:grid-cols-[1.45fr_1fr]"><section className="rounded-[1.4rem] border border-ink/10 bg-white p-6 shadow-sm"><div className="flex items-center justify-between"><h2 className="font-display text-3xl uppercase">Registrations · last 14 days</h2><span className="text-xs font-bold text-ink/45">Live data</span></div><div className="mt-7 flex h-64 items-end gap-2 border-b border-ink/10 sm:gap-3">{overview.daily.map((day, index) => <div key={day.label + index} className="flex h-full flex-1 flex-col items-center justify-end gap-2"><div className={`w-full rounded-t-lg ${index === overview.daily.length - 1 ? 'bg-[#b52e28]' : 'bg-[#b9d5ec]'}`} style={{ height: Math.max(4, (day.value / max) * 90) + '%' }} /><span className="text-xs font-semibold text-ink/45">{day.label}</span></div>)}</div></section><section className="rounded-[1.4rem] border border-ink/10 bg-white p-6 shadow-sm"><h2 className="font-display text-3xl uppercase">Capacity</h2><div className="mt-5 h-3 overflow-hidden rounded-full bg-[#e3e6eb]"><div className="h-full bg-[#1469a9]" style={{ width: Math.min(100, overview.onsite / 25) + '%' }} /></div><div className="mt-6 grid gap-4">{overview.capacity.map((item) => <div key={item.label} className="flex items-center justify-between text-sm font-semibold"><span>{item.label}</span><strong>{item.value}</strong></div>)}</div></section></div><div className="mt-6 grid gap-4 md:grid-cols-3"><ActionPanel title="Approvals" value={overview.awaiting_approval} action="Review queue" onClick={() => select('Approvals')} /><ActionPanel title="Testimonies" value="Review" action="Open testimonies" onClick={() => select('Testimonies')} /><ActionPanel title="Broadcasts" value="Manage" action="Create update" onClick={() => select('Broadcasts')} /></div></>; }
 function Metric({ label, value, detail, alert = false }: { label: string; value: number; detail: string; alert?: boolean }) { return <article className="rounded-[1.25rem] border border-ink/10 bg-white p-6 shadow-sm"><p className="text-sm font-semibold text-ink/60">{label}</p><strong className="mt-2 block font-display text-5xl">{value.toLocaleString()}</strong><p className={`mt-3 text-sm font-bold ${alert ? 'text-coral' : 'text-[#34865e]'}`}>{detail}</p></article>; }
 function ActionPanel({ title, value, action, onClick }: { title: string; value: number | string; action: string; onClick: () => void }) { return <article className="rounded-[1.25rem] border border-ink/10 bg-white p-5 shadow-sm"><p className="text-sm font-semibold text-ink/55">{title}</p><strong className="mt-1 block font-display text-4xl">{value}</strong><button type="button" onClick={onClick} className="mt-5 text-sm font-bold text-[#1469a9]">{action} →</button></article>; }
-function RegistrantView({ people, onReview, empty = 'No registrants yet.' }: { people: Registrant[]; onReview: (id: number, status: 'approved' | 'rejected') => Promise<void>; empty?: string }) { return <section className="overflow-hidden rounded-[1.4rem] border border-ink/10 bg-white shadow-sm">{people.length === 0 ? <p className="p-8 text-sm text-ink/60">{empty}</p> : <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-[#f1f2f4] text-xs uppercase tracking-[.1em] text-ink/50"><tr><th className="p-4">Registrant</th><th className="p-4">Role</th><th className="p-4">Attendance</th><th className="p-4">Status</th><th className="p-4">Action</th></tr></thead><tbody>{people.map((person) => <tr key={person.id} className="border-t border-ink/10"><td className="p-4"><strong className="block">{person.name}</strong><span className="text-xs text-ink/50">{person.email}</span></td><td className="p-4">{person.role || '—'}</td><td className="p-4">{person.attendance_mode || '—'}</td><td className="p-4"><span className={`rounded-full px-3 py-1 text-xs font-bold ${person.approval_status === 'approved' ? 'bg-[#dff2e5] text-[#34865e]' : person.approval_status === 'rejected' ? 'bg-[#fff0ee] text-coral' : 'bg-[#fff4d9] text-[#8d651e]'}`}>{person.approval_status}</span></td><td className="p-4">{person.approval_status === 'pending' ? <div className="flex gap-2"><button type="button" onClick={() => void onReview(person.id, 'approved')} className="rounded-full bg-[#34865e] px-3 py-2 text-xs font-bold text-white">Approve</button><button type="button" onClick={() => void onReview(person.id, 'rejected')} className="rounded-full bg-[#fff0ee] px-3 py-2 text-xs font-bold text-coral">Reject</button></div> : <span className="text-xs text-ink/45">{person.ticket_code || 'No ticket'}</span>}</td></tr>)}</tbody></table></div>}</section>; }
-function TestimonialView({ items, onReview }: { items: Testimonial[]; onReview: (id: number, status: 'approved' | 'rejected') => Promise<void> }) { return <div className="grid gap-4">{items.length === 0 && <div className="rounded-2xl bg-white p-8 text-sm text-ink/60">No testimonies have been submitted.</div>}{items.map((item) => <article key={item.id} className="rounded-[1.4rem] border border-ink/10 bg-white p-6 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{item.name}</strong><p className="text-xs text-ink/50">{item.email} · {item.topic || 'General'}{item.event ? ` · ${item.event}` : ''}</p></div><span className="rounded-full bg-[#fff4d9] px-3 py-1 text-xs font-bold">{item.status}</span></div><p className="mt-5 leading-7 text-ink/75">{item.content}</p>{item.status === 'pending' && <div className="mt-5 flex gap-2"><button type="button" onClick={() => void onReview(item.id, 'approved')} className="rounded-full bg-[#34865e] px-4 py-2 text-xs font-bold text-white">Publish</button><button type="button" onClick={() => void onReview(item.id, 'rejected')} className="rounded-full bg-[#fff0ee] px-4 py-2 text-xs font-bold text-coral">Reject</button></div>}</article>)}</div>; }
-function BroadcastView({ items, onCreated }: { items: Broadcast[]; onCreated: () => Promise<void> }) { const [title, setTitle] = useState(''); const [body, setBody] = useState(''); const [status, setStatus] = useState('draft'); const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); try { const result = await api('/admin/broadcasts', { method: 'POST', body: JSON.stringify({ title, body, status }) }); setTitle(''); setBody(''); toast.success(status === 'sent' ? `Broadcast sent to ${result.recipients ?? 0} delegates.` : 'Broadcast saved.'); await onCreated(); } catch (submitError) { toast.error(errorMessage(submitError, 'Could not save broadcast.')); } }; return <div className="grid gap-6 xl:grid-cols-[minmax(0,420px)_1fr]"><form onSubmit={submit} className="rounded-[1.4rem] bg-[#03284a] p-6 text-white shadow-sm"><p className="eyebrow text-[#ff7565]">Admin tools</p><h2 className="mt-3 font-display text-4xl uppercase">New broadcast</h2><input required value={title} onChange={(event) => setTitle(event.target.value)} className="mt-7 w-full rounded-xl bg-white p-4 text-ink outline-none" placeholder="Broadcast title" /><textarea required value={body} onChange={(event) => setBody(event.target.value)} className="mt-3 min-h-36 w-full rounded-xl bg-white p-4 text-ink outline-none" placeholder="Write an update for delegates..." /><select value={status} onChange={(event) => setStatus(event.target.value)} className="mt-3 w-full rounded-xl bg-white p-4 text-ink"><option value="draft">Save draft</option><option value="scheduled">Schedule</option><option value="sent">Send now</option></select><button className="mt-5 w-full rounded-full bg-white px-5 py-4 text-sm font-bold text-[#0b4779]">Save broadcast</button></form><div className="grid gap-3">{items.length === 0 && <div className="rounded-2xl bg-white p-8 text-sm text-ink/60">No broadcasts yet.</div>}{items.map((item) => <article key={item.id} className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm"><div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{item.title}</h3><p className="mt-2 text-sm leading-6 text-ink/60">{item.body}</p></div><span className="rounded-full bg-[#eaf3fb] px-3 py-1 text-xs font-bold text-[#0b4779]">{item.status}</span></div></article>)}</div></div>; }
-type ColorDraft = { name: string; hex: string; image: string };
-
-function ShopProductsView({ items, onSaved }: { items: ShopProduct[]; onSaved: () => Promise<void> }) {
-  const empty = { name: '', description: '', price: '', image: '', tag: '', stock: '', active: true, sort_order: '0' };
-  const [form, setForm] = useState(empty);
-  const [colors, setColors] = useState<ColorDraft[]>([]);
-  const [sizes, setSizes] = useState<string[]>([]);
-  const [customSize, setCustomSize] = useState('');
-  const [editing, setEditing] = useState<number | null>(null);
-  const update = (field: keyof typeof empty, value: string | boolean) => setForm((current) => ({ ...current, [field]: value }));
-  const reset = () => { setForm(empty); setColors([]); setSizes([]); setCustomSize(''); setEditing(null); };
-  const edit = (item: ShopProduct) => {
-    setEditing(item.id);
-    setForm({ name: item.name, description: item.description || '', price: String(item.price), image: item.image || '', tag: item.tag || '', stock: item.stock === null ? '' : String(item.stock), active: item.active, sort_order: String(item.sort_order) });
-    setColors((item.colors ?? []).map((color) => ({ name: color.name, hex: color.hex, image: color.image || '' })));
-    setSizes(item.sizes ?? []);
-  };
-  const updateColor = (index: number, field: keyof ColorDraft, value: string) => setColors((current) => current.map((color, position) => position === index ? { ...color, [field]: value } : color));
-  const toggleSize = (size: string) => setSizes((current) => current.includes(size) ? current.filter((item) => item !== size) : [...current, size]);
-  const addCustomSize = () => { const size = customSize.trim().toUpperCase(); if (size && !sizes.includes(size)) setSizes((current) => [...current, size]); setCustomSize(''); };
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const cleanColors = colors.filter((color) => color.name.trim()).map((color) => ({ name: color.name.trim(), hex: color.hex, image: color.image.trim() || null }));
-    const payload = { ...form, price: Number(form.price), stock: form.stock ? Number(form.stock) : null, sort_order: Number(form.sort_order), colors: cleanColors.length ? cleanColors : null, sizes: sizes.length ? sizes : null };
-    try {
-      await api(editing ? `/admin/shop/products/${editing}` : '/admin/shop/products', { method: editing ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
-      reset(); toast.success('Shop content saved.'); await onSaved();
-    } catch (error) { toast.error(errorMessage(error, 'Could not save shop content.')); }
-  };
-  const remove = async (id: number) => {
-    if (!window.confirm('Delete this product?')) return;
-    try { await api(`/admin/shop/products/${id}`, { method: 'DELETE' }); toast.success('Product deleted.'); await onSaved(); } catch (error) { toast.error(errorMessage(error, 'Could not delete the product.')); }
-  };
-  const orderedSizes = [...STANDARD_SIZES.filter((size) => sizes.includes(size)), ...sizes.filter((size) => !STANDARD_SIZES.includes(size))];
-  return <div className="grid gap-6 xl:grid-cols-[minmax(0,460px)_1fr]"><form onSubmit={submit} className="rounded-[1.4rem] bg-[#03284a] p-6 text-white shadow-sm">
-    <p className="eyebrow text-[#ff7565]">Admin tools</p><h2 className="mt-3 font-display text-4xl uppercase">{editing ? 'Edit product' : 'New product'}</h2>
-    <input required value={form.name} onChange={(event) => update('name', event.target.value)} className="mt-7 w-full rounded-xl bg-white p-4 text-ink" placeholder="Product name" />
-    <textarea value={form.description} onChange={(event) => update('description', event.target.value)} className="mt-3 min-h-24 w-full rounded-xl bg-white p-4 text-ink" placeholder="Description" />
-    <div className="mt-3 grid grid-cols-2 gap-3"><input required type="number" min="0" value={form.price} onChange={(event) => update('price', event.target.value)} className="w-full rounded-xl bg-white p-4 text-ink" placeholder="Price in ₦" /><input type="number" min="0" value={form.stock} onChange={(event) => update('stock', event.target.value)} className="w-full rounded-xl bg-white p-4 text-ink" placeholder="Stock (all variants)" /></div>
-    <input value={form.image} onChange={(event) => update('image', event.target.value)} className="mt-3 w-full rounded-xl bg-white p-4 text-ink" placeholder="Main image path or URL" />
-    <div className="mt-3 grid grid-cols-2 gap-3"><input value={form.tag} onChange={(event) => update('tag', event.target.value)} className="w-full rounded-xl bg-white p-4 text-ink" placeholder="Tag" /><input type="number" min="0" value={form.sort_order} onChange={(event) => update('sort_order', event.target.value)} className="w-full rounded-xl bg-white p-4 text-ink" placeholder="Order" /></div>
-
-    <fieldset className="mt-6 rounded-2xl border border-white/15 p-4">
-      <legend className="px-2 text-sm font-bold">Colours</legend>
-      <p className="text-xs text-[#9bc4e5]">Shoppers must pick one. Leave empty for products without colour options.</p>
-      <div className="mt-3 grid gap-3">
-        {colors.map((color, index) => <div key={index} className="grid gap-2 rounded-xl bg-white/5 p-3">
-          <div className="flex items-center gap-2">
-            <input type="color" value={color.hex} onChange={(event) => updateColor(index, 'hex', event.target.value)} className="h-11 w-12 shrink-0 cursor-pointer rounded-lg border-0 bg-transparent p-0" aria-label="Colour swatch" />
-            <input required value={color.name} onChange={(event) => updateColor(index, 'name', event.target.value)} className="min-w-0 flex-1 rounded-xl bg-white p-3 text-sm text-ink" placeholder="Colour name, e.g. Navy" />
-            <button type="button" onClick={() => setColors((current) => current.filter((_, position) => position !== index))} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 text-lg" aria-label={`Remove ${color.name || 'colour'}`}>×</button>
-          </div>
-          <input value={color.image} onChange={(event) => updateColor(index, 'image', event.target.value)} className="w-full rounded-xl bg-white p-3 text-sm text-ink" placeholder="Photo for this colour (optional)" />
-        </div>)}
-      </div>
-      <button type="button" onClick={() => setColors((current) => [...current, { name: '', hex: '#1b2a4e', image: '' }])} className="mt-3 rounded-full border border-white/30 px-4 py-2 text-xs font-bold">+ Add colour</button>
-    </fieldset>
-
-    <fieldset className="mt-4 rounded-2xl border border-white/15 p-4">
-      <legend className="px-2 text-sm font-bold">Sizes</legend>
-      <p className="text-xs text-[#9bc4e5]">Shoppers must pick one. Leave all off for one-size items.</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {[...STANDARD_SIZES, ...sizes.filter((size) => !STANDARD_SIZES.includes(size))].map((size) => <button key={size} type="button" onClick={() => toggleSize(size)} aria-pressed={sizes.includes(size)} className={`min-w-12 rounded-lg px-3 py-2 text-sm font-bold transition ${sizes.includes(size) ? 'bg-white text-[#0b4779]' : 'bg-white/10 text-white/70'}`}>{size}</button>)}
-      </div>
-      <div className="mt-3 flex gap-2"><input value={customSize} onChange={(event) => setCustomSize(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCustomSize(); } }} className="min-w-0 flex-1 rounded-xl bg-white p-3 text-sm text-ink" placeholder="Other size, e.g. 4XL" /><button type="button" onClick={addCustomSize} className="rounded-full border border-white/30 px-4 text-xs font-bold">Add</button></div>
-      {orderedSizes.length > 0 && <p className="mt-3 text-xs text-[#dbe9f8]">Offered: {orderedSizes.join(', ')}</p>}
-    </fieldset>
-
-    <label className="mt-4 flex items-center gap-3 text-sm"><input type="checkbox" checked={form.active} onChange={(event) => update('active', event.target.checked)} /> Visible in public shop</label>
-    <div className="mt-5 flex gap-2"><button className="flex-1 rounded-full bg-white px-5 py-4 text-sm font-bold text-[#0b4779]">{editing ? 'Update product' : 'Create product'}</button>{editing && <button type="button" onClick={reset} className="rounded-full border border-white/30 px-4 py-3 text-sm font-bold">Cancel</button>}</div>
-  </form>
-  <div className="grid content-start gap-3">{items.length === 0 && <div className="rounded-2xl bg-white p-8 text-sm text-ink/60">No shop products yet.</div>}{items.map((item) => <article key={item.id} className="flex flex-col gap-4 rounded-2xl border border-ink/10 bg-white p-4 shadow-sm sm:flex-row sm:items-center"><img src={item.image || '/images/miv-logo.png'} alt="" className="h-24 w-24 rounded-xl object-cover" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">{item.name}</h3><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${item.active ? 'bg-[#dff2e5] text-[#34865e]' : 'bg-[#f1f2f4] text-ink/50'}`}>{item.active ? 'Visible' : 'Hidden'}</span></div><p className="mt-1 text-sm text-ink/55">₦{item.price.toLocaleString()} · {item.tag || 'No tag'}{item.stock !== null ? ` · ${item.stock} in stock` : ''}</p>{((item.colors?.length ?? 0) > 0 || (item.sizes?.length ?? 0) > 0) && <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-ink/60">{(item.colors ?? []).map((color) => <span key={color.name} className="flex items-center gap-1.5 rounded-full bg-[#f4f5f7] px-2 py-1"><span className="h-3 w-3 rounded-full ring-1 ring-inset ring-black/10" style={{ background: color.hex }} />{color.name}</span>)}{(item.sizes?.length ?? 0) > 0 && <span className="rounded-full bg-[#f4f5f7] px-2 py-1">{item.sizes?.join(' · ')}</span>}</div>}</div><div className="flex gap-2"><button type="button" onClick={() => edit(item)} className="rounded-full border border-ink/15 px-4 py-2 text-xs font-bold">Edit</button><button type="button" onClick={() => void remove(item.id)} className="rounded-full bg-[#fff0ee] px-4 py-2 text-xs font-bold text-coral">Delete</button></div></article>)}</div></div>;
-}
-
-function PartnerInquiryView({ items, onReview }: { items: PartnerInquiry[]; onReview: (id: number, status: PartnerInquiry['status']) => Promise<void> }) {
-  return <div className="grid gap-4">{items.length === 0 && <div className="rounded-2xl bg-white p-8 text-sm text-ink/60">No partner enquiries yet.</div>}{items.map((item) => <article key={item.id} className="rounded-[1.4rem] border border-ink/10 bg-white p-6 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="font-bold">{item.name}</h2><p className="mt-1 text-sm text-ink/55">{item.email}{item.phone ? ` · ${item.phone}` : ''}{item.organization ? ` · ${item.organization}` : ''}</p></div><select value={item.status} onChange={(event) => void onReview(item.id, event.target.value as PartnerInquiry['status'])} className="rounded-full border border-ink/15 bg-white px-3 py-2 text-xs font-bold"><option value="new">New</option><option value="contacted">Contacted</option><option value="closed">Closed</option></select></div><p className="mt-5 whitespace-pre-wrap leading-7 text-ink/75">{item.message}</p></article>)}</div>;
-}
-function InfoView({ title, text, items }: { title: string; text: string; items: string[] }) { return <div className="max-w-3xl rounded-[1.4rem] border border-ink/10 bg-white p-7 shadow-sm"><p className="eyebrow">Admin workspace</p><h2 className="mt-3 font-display text-5xl uppercase">{title}</h2><p className="mt-5 leading-7 text-ink/60">{text}</p><div className="mt-7 grid gap-3 sm:grid-cols-3">{items.map((item) => <div key={item} className="rounded-xl bg-[#f6f2e9] p-4 text-sm font-bold">{item}<span className="mt-3 block text-xs font-normal text-[#34865e]">Ready</span></div>)}</div></div>; }

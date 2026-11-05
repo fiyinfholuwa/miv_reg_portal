@@ -40,6 +40,13 @@ class DashboardController extends Controller
 
     public function broadcasts(): JsonResponse
     {
-        return response()->json(['broadcasts' => Broadcast::query()->where('status', 'sent')->orWhere('status', 'scheduled')->latest()->limit(20)->get()]);
+        $broadcasts = Broadcast::query()
+            ->where(fn ($query) => $query->where('status', 'sent')
+                ->orWhere(fn ($scheduled) => $scheduled->where('status', 'scheduled')->where('scheduled_at', '<=', now())))
+            ->latest()
+            ->limit(20)
+            ->get(['id', 'title', 'body', 'scheduled_at', 'created_at']);
+
+        return response()->json(['broadcasts' => $broadcasts]);
     }
 }

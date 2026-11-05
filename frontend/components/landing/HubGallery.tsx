@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { galleryItems, type HubEvent } from './hub-data';
+import type { HubEvent } from './hub-data';
+import type { GalleryItem, SiteContent } from '../../lib/site-content';
 
 function PlayIcon({ size }: { size: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="#00203f" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>;
@@ -12,7 +13,7 @@ function PlayIcon({ size }: { size: number }) {
  * and pause while hovered. Transforms are written directly to the DOM each
  * frame so React does not re-render 60 times a second.
  */
-type GalleryTile = (typeof galleryItems)[number] & { tag: string };
+type GalleryTile = GalleryItem & { tag: string };
 
 function CurveReel({ items, step, tileW, tileH, perspective, compact }: { items: GalleryTile[]; step: number; tileW: number; tileH: number; perspective: number; compact?: boolean }) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -74,12 +75,13 @@ function CurveReel({ items, step, tileW, tileH, perspective, compact }: { items:
           className="absolute left-1/2 top-1/2 m-0 overflow-hidden bg-[#003070] will-change-transform"
           style={{ width: tileW, height: tileH, marginLeft: -tileW / 2, marginTop: -tileH / 2, borderRadius: compact ? 12 : 14, boxShadow: compact ? '0 20px 50px rgba(0,0,0,.45)' : '0 18px 40px rgba(0,32,63,.22)' }}
         >
-          <img src={item.src} alt={item.caption} className="block h-full w-full object-cover" loading="lazy" />
+          <img src={item.image} alt={item.caption} className="block h-full w-full object-cover" loading="lazy" />
+          {item.video_url && <a href={item.video_url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-10" aria-label={`Watch ${item.caption}`} />}
           <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_55%,rgba(0,12,26,.88))]" />
-          {item.duration && (
+          {(item.duration || item.video_url) && (
             <>
               <div className="absolute left-1/2 top-[44%] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/95" style={{ width: compact ? 33 : 58, height: compact ? 33 : 58 }}><PlayIcon size={compact ? 13 : 22} /></div>
-              <span className="absolute right-2.5 top-2.5 rounded-full bg-black/60 px-[9px] py-[3px] font-semibold text-white" style={{ fontSize: compact ? 10 : 13 }}>{item.duration}</span>
+              {item.duration && <span className="absolute right-2.5 top-2.5 rounded-full bg-black/60 px-[9px] py-[3px] font-semibold text-white" style={{ fontSize: compact ? 10 : 13 }}>{item.duration}</span>}
             </>
           )}
           <figcaption className="absolute inset-x-3.5 bottom-3 flex flex-col gap-0.5 text-white">
@@ -92,7 +94,7 @@ function CurveReel({ items, step, tileW, tileH, perspective, compact }: { items:
   );
 }
 
-export default function HubGallery({ events }: { events: HubEvent[] }) {
+export default function HubGallery({ events, content }: { events: HubEvent[]; content: SiteContent['gallery'] }) {
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [isMobile, setIsMobile] = useState(false);
@@ -109,17 +111,17 @@ export default function HubGallery({ events }: { events: HubEvent[] }) {
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return galleryItems
-      .filter((item) => (filter === 'all' || item.event === filter) && (!q || `${item.caption} ${shortNames[item.event] ?? ''}`.toLowerCase().includes(q)))
-      .map((item) => ({ ...item, tag: shortNames[item.event] ?? item.event.toUpperCase() }));
-  }, [filter, query, shortNames]);
+    return content.items
+      .filter((item) => (filter === 'all' || item.event === filter) && (!q || `${item.caption} ${item.event ? shortNames[item.event] ?? '' : ''}`.toLowerCase().includes(q)))
+      .map((item) => ({ ...item, tag: item.event ? shortNames[item.event] ?? item.event.toUpperCase() : 'MIV' }));
+  }, [content.items, filter, query, shortNames]);
 
   return (
     <section id="gallery" className="flex scroll-mt-28 flex-col gap-6 overflow-hidden pb-16 pt-16 text-[#0c0d10] sm:gap-9 sm:pb-20 sm:pt-24">
       <div className="flex flex-col gap-4 px-5 sm:items-center sm:px-10 sm:text-center lg:px-[72px]">
         <span className="text-sm font-semibold text-[#a82e26] sm:text-[15px]">Gallery</span>
-        <h2 className="m-0 max-w-[720px] text-[32px] font-medium leading-[1.1] tracking-[-0.02em] [text-wrap:balance] sm:text-[44px] lg:text-[52px]">Moments from past events, in pictures and video</h2>
-        <p className="m-0 text-base leading-[1.55] text-[#4d5460] sm:text-[17px]">Worship, teaching and fellowship from across MIV gatherings.</p>
+        <h2 className="m-0 max-w-[720px] text-[32px] font-medium leading-[1.1] tracking-[-0.02em] [text-wrap:balance] sm:text-[44px] lg:text-[52px]">{content.heading}</h2>
+        <p className="m-0 text-base leading-[1.55] text-[#4d5460] sm:text-[17px]">{content.subheading}</p>
         <div className="mt-2 grid w-full grid-cols-2 gap-2 sm:max-w-[480px] sm:gap-3">
           <div className="relative">
             <label htmlFor="gallery-filter" className="sr-only">Filter by event</label>

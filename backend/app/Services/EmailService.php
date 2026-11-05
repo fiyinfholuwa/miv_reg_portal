@@ -11,20 +11,38 @@ use ElasticEmail\Model\EmailTransactionalMessageData;
 use ElasticEmail\Model\TransactionalRecipient;
 use GuzzleHttp\Client;
 use Illuminate\Mail\Mailable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
+/**
+ * All outgoing email goes through Elastic Email.
+ *
+ * - Each address can receive at most `services.elasticemail.per_recipient_per_minute`
+ *   emails a minute (default 2), so codes can't be used to flood an inbox.
+ *   Admin broadcasts skip this limit.
+ * - Without an API key, local development writes emails to the log and tests use
+ *   Laravel's mail fake; any other environment refuses to send.
+ */
 class EmailService
 {
+    private const RATE_WINDOW_SECONDS = 60;
+
     /**
-     * Send a Laravel mailable through Elastic Email when configured.
-     *
-     * Keeping the Laravel fallback makes local development and automated tests
-     * useful without requiring a live provider account.
+     * @param  bool  $rateLimited  False for admin broadcasts, which must reach everyone.
      */
-    public function sendMailable(Mailable $mailable, string $recipient, ?string $idempotencyKey = null): void
+    public function sendMailable(Mailable $mailable, string $recipient, ?string $idempotencyKey = null, bool $rateLimited = true): void
     {
+        if ($rateLimited) {
+            $this->ensureCanEmail($recipient);
+            RateLimiter::hit($this->rateKey($recipient), self::RATE_WINDOW_SECONDS);
+        }
+
         if (! $this->isConfigured()) {
-            Mail::to($recipient)->send($mailable);
+            $this->sendWithoutProvider($mailable, $recipient);
 
             return;
         }
@@ -39,6 +57,23 @@ class EmailService
             text: $this->plainText($html),
             idempotencyKey: $idempotencyKey,
         );
+    }
+
+    /**
+     * Throws a friendly 429 when this address has hit its per-minute limit.
+     * Call it before doing work (like issuing a new code) that leads to an email.
+     */
+    public function ensureCanEmail(string $recipient): void
+    {
+        $key = $this->rateKey($recipient);
+
+        if (RateLimiter::tooManyAttempts($key, $this->perMinute())) {
+            $seconds = max(1, RateLimiter::availableIn($key));
+
+            throw ValidationException::withMessages([
+                'email' => ["We've just emailed this address. Please wait {$seconds} seconds before requesting another email."],
+            ])->status(429);
+        }
     }
 
     public function send(
@@ -79,12 +114,56 @@ class EmailService
             ]),
         ]);
 
-        $emails->emailsTransactionalPost($message, $idempotencyKey);
+        try {
+            $emails->emailsTransactionalPost($message, $idempotencyKey);
+        } catch (Throwable $exception) {
+            Log::error('Elastic Email send failed', ['recipient' => $recipient, 'subject' => $subject, 'error' => $exception->getMessage()]);
+
+            throw ValidationException::withMessages([
+                'email' => ['We could not send the email right now. Please try again in a moment.'],
+            ])->status(503);
+        }
     }
 
     public function isConfigured(): bool
     {
         return ! app()->environment('testing') && filled(config('services.elasticemail.api_key'));
+    }
+
+    /**
+     * Tests go through Laravel's mail fake; local development logs the email
+     * (storage/logs/laravel.log) instead of sending it; anything else is a
+     * misconfiguration and fails loudly.
+     */
+    private function sendWithoutProvider(Mailable $mailable, string $recipient): void
+    {
+        if (app()->environment('testing')) {
+            Mail::to($recipient)->send($mailable);
+
+            return;
+        }
+
+        if (app()->environment('local')) {
+            Mail::mailer('log')->to($recipient)->send($mailable);
+
+            return;
+        }
+
+        Log::critical('Email not sent: ELASTICEMAIL_API_KEY is missing.', ['recipient' => $recipient]);
+
+        throw ValidationException::withMessages([
+            'email' => ['Email delivery is not set up yet. Please contact the organisers.'],
+        ])->status(503);
+    }
+
+    private function rateKey(string $recipient): string
+    {
+        return 'email-recipient:'.sha1(Str::lower(trim($recipient)));
+    }
+
+    private function perMinute(): int
+    {
+        return max(1, (int) config('services.elasticemail.per_recipient_per_minute', 2));
     }
 
     private function fromHeader(): string

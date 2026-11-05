@@ -4,7 +4,9 @@
       "Bash(grep -n 'foreach \\($products' -B2 -A4 database/seeders/DatabaseSeeder.php)",
       "Bash(bash -c ' *)",
       "Bash(grep -v '^\\\\s*//\\\\|^\\\\s*\\\\*\\\\|^$')",
-      "Bash(grep -i \"^gd$\")"
+      "Bash(grep -i \"^gd$\")",
+      "Bash(grep -n ''\\\\''status'\\\\'' => $status === '\\\\''approved'\\\\''' app/Services/AdminService.php)",
+      "Bash(composer show *)"
     ]
   }
 }

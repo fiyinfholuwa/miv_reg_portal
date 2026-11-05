@@ -10,6 +10,8 @@ use Illuminate\Validation\ValidationException;
 
 class EventService
 {
+    public function __construct(private readonly TeamService $teamService) {}
+
     /**
      * @return list<array<string, mixed>>
      */
@@ -39,7 +41,7 @@ class EventService
     public function registrationsFor(User $user): array
     {
         return $user->eventRegistrations()
-            ->with('event')
+            ->with(['event', 'team.leader'])
             ->get()
             ->sortBy(fn (EventRegistration $registration): array => [
                 $registration->event->starts_at === null ? 1 : 0,
@@ -125,6 +127,7 @@ class EventService
             ],
             'is_featured' => $event->is_featured,
             'registration_open' => $event->registration_open,
+            'sort_order' => $event->sort_order,
         ];
     }
 
@@ -140,6 +143,8 @@ class EventService
             'attendance_days' => $registration->attendance_days ?? [],
             'needs_accommodation' => $registration->needs_accommodation,
             'registered_at' => $registration->created_at?->toIso8601String(),
+            'checked_in_at' => $registration->checked_in_at?->toIso8601String(),
+            'team' => $this->teamService->delegatePayload($registration->team),
             'event' => $this->eventPayload($registration->event),
         ];
     }

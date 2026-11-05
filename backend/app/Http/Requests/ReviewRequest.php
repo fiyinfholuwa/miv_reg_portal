@@ -13,6 +13,6 @@ class ReviewRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['status' => ['required', 'in:approved,rejected,published']];
+        return ['status' => ['required', 'in:approved,rejected,published,pending']];
     }
 }

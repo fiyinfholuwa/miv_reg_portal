@@ -1,51 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import type { Hotel, MivEvent, ProgrammeDay } from '../../lib/events';
+import { FormEvent, useEffect, useState } from 'react';
+import type { Hotel, MivEvent } from '../../lib/events';
 import { errorMessage, toast } from '../../lib/toast';
-import { api, uploadImage } from './adminApi';
+import { api } from './adminApi';
+import { Field, ImageInput, SaveBar, card, input, label } from './adminUi';
+import { Modal, primaryButton, secondaryButton } from './table';
 
 type AdminEvent = MivEvent & { publicity: { caption: string | null; assets: { title: string; image: string }[] }; registrations_count: number };
 type Tab = 'Programme' | 'Live' | 'Publicity kit' | 'Hotels';
 const TABS: Tab[] = ['Programme', 'Live', 'Publicity kit', 'Hotels'];
-
-const input = 'w-full rounded-xl border border-ink/15 bg-white px-3.5 py-2.5 text-sm text-ink outline-none focus:border-[#1469a9]';
-const label = 'block text-xs font-bold uppercase tracking-[.08em] text-ink/50';
-const card = 'rounded-[1.25rem] border border-ink/10 bg-white p-4 sm:p-5';
-
-function Field({ title, children, className = '' }: { title: string; children: ReactNode; className?: string }) {
-  return <label className={`grid gap-1.5 ${className}`}><span className={label}>{title}</span>{children}</label>;
-}
-
-function SaveBar({ saving, onSave, note }: { saving: boolean; onSave: () => void; note?: string }) {
-  return (
-    <div className="sticky bottom-0 z-10 -mx-1 mt-6 flex items-center justify-between gap-3 rounded-2xl bg-[#03284a] px-4 py-3 text-white shadow-lg">
-      <span className="text-xs text-[#9bc4e5]">{note ?? 'Changes show on delegates’ dashboards as soon as you save.'}</span>
-      <button type="button" onClick={onSave} disabled={saving} className="shrink-0 rounded-full bg-white px-6 py-2.5 text-sm font-bold text-[#03284a] disabled:opacity-60">{saving ? 'Saving…' : 'Save changes'}</button>
-    </div>
-  );
-}
-
-/** Image preview with upload and paste-a-link options. */
-function ImageInput({ value, onChange, aspect = 'aspect-square' }: { value: string; onChange: (url: string) => void; aspect?: string }) {
-  const file = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const upload = async (chosen?: File) => {
-    if (!chosen) return;
-    setUploading(true);
-    try { onChange(await uploadImage(chosen)); toast.success('Image uploaded.'); } catch (error) { toast.error(errorMessage(error, 'Upload failed.')); } finally { setUploading(false); }
-  };
-  return (
-    <div className="grid gap-2">
-      <button type="button" onClick={() => file.current?.click()} className={`relative grid ${aspect} w-full place-items-center overflow-hidden rounded-xl border-2 border-dashed border-ink/15 bg-[#f6f2e9] text-xs font-bold text-ink/50 hover:border-[#1469a9]`}>
-        {value ? <img src={value} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <span>{uploading ? 'Uploading…' : '+ Upload image'}</span>}
-        {value && <span className="absolute bottom-2 right-2 rounded-full bg-white/95 px-2.5 py-1 text-[11px] text-ink shadow">{uploading ? 'Uploading…' : 'Replace'}</span>}
-      </button>
-      <input ref={file} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { void upload(event.target.files?.[0]); event.target.value = ''; }} />
-      <input value={value} onChange={(event) => onChange(event.target.value)} className={`${input} text-xs`} placeholder="…or paste an image link" />
-    </div>
-  );
-}
 
 /* ---------------------------------------------------------------- Programme */
 
@@ -59,55 +23,105 @@ function dayName(date: string) {
   return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
 }
 
+const to12h = (value?: string | null) => { if (!value) return ''; const [hours, minutes] = value.split(':').map(Number); return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${hours < 12 ? 'AM' : 'PM'}`; };
+
+type Session = { start: string; end: string; title: string; detail: string };
+type Day = { day: string; date: string; sessions: Session[] };
+
+/** Saves the whole content section and reports the updated event. */
+async function saveContent(event: AdminEvent, body: Record<string, unknown>, onSaved: (event: AdminEvent) => void, success: string) {
+  const data = await api(`/admin/events/${event.slug}/content`, { method: 'PATCH', body: JSON.stringify(body) });
+  onSaved({ ...event, ...data.event, publicity: (body.publicity as AdminEvent['publicity']) ?? event.publicity });
+  toast.success(success);
+}
+
 function ProgrammeEditor({ event, onSaved }: { event: AdminEvent; onSaved: (event: AdminEvent) => void }) {
-  const [days, setDays] = useState<ProgrammeDay[]>(() => event.programme.map((day) => ({ ...day, date: day.date ?? '', sessions: day.sessions.map((session) => ({ start: session.start ?? '', end: session.end ?? '', title: session.title, detail: session.detail ?? '' })) })));
+  const days: Day[] = event.programme.map((day) => ({ day: day.day, date: day.date ?? '', sessions: day.sessions.map((session) => ({ start: session.start ?? '', end: session.end ?? '', title: session.title, detail: session.detail ?? '' })) }));
+  const [dayModal, setDayModal] = useState<{ index: number | null; date: string; label: string } | null>(null);
+  const [sessionModal, setSessionModal] = useState<{ dayIndex: number; index: number | null; session: Session } | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const updateDay = (index: number, patch: Partial<ProgrammeDay>) => setDays((current) => current.map((day, position) => position === index ? { ...day, ...patch } : day));
-  const updateSession = (dayIndex: number, sessionIndex: number, field: string, value: string) => setDays((current) => current.map((day, position) => position === dayIndex ? { ...day, sessions: day.sessions.map((session, index) => index === sessionIndex ? { ...session, [field]: value } : session) } : day));
-  const addDay = () => setDays((current) => {
-    const fallback = event.starts_at ? event.starts_at.slice(0, 10) : null;
-    const date = current.length ? nextDate(current[current.length - 1].date) : (fallback ?? nextDate(null));
-    return [...current, { day: dayName(date), date, sessions: [] }];
-  });
-
-  const save = async () => {
+  const persist = async (next: Day[], success: string) => {
     setSaving(true);
     try {
-      const programme = days.map((day) => ({ day: day.day || (day.date ? dayName(day.date) : ''), date: day.date, sessions: day.sessions.map((session) => ({ start: session.start, end: session.end || null, title: session.title, detail: session.detail || null })) }));
-      const data = await api(`/admin/events/${event.slug}/content`, { method: 'PATCH', body: JSON.stringify({ programme }) });
-      onSaved({ ...event, ...data.event, publicity: event.publicity });
-      toast.success('Programme saved.');
-    } catch (error) { toast.error(errorMessage(error, 'Could not save the programme.')); } finally { setSaving(false); }
+      await saveContent(event, { programme: next.map((day) => ({ day: day.day || dayName(day.date), date: day.date, sessions: day.sessions.map((session) => ({ start: session.start, end: session.end || null, title: session.title, detail: session.detail || null })) })) }, onSaved, success);
+      return true;
+    } catch (error) { toast.error(errorMessage(error, 'Could not save the programme.')); return false; } finally { setSaving(false); }
   };
+
+  const openNewDay = () => {
+    const date = days.length ? nextDate(days[days.length - 1].date) : (event.starts_at ? event.starts_at.slice(0, 10) : nextDate(null));
+    setDayModal({ index: null, date, label: dayName(date) });
+  };
+  const saveDay = async (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    if (!dayModal) return;
+    const next = dayModal.index === null ? [...days, { day: dayModal.label, date: dayModal.date, sessions: [] }] : days.map((day, index) => index === dayModal.index ? { ...day, day: dayModal.label, date: dayModal.date } : day);
+    if (await persist(next, dayModal.index === null ? 'Day added.' : 'Day updated.')) setDayModal(null);
+  };
+  const removeDay = async (index: number) => {
+    if (!window.confirm(`Remove ${days[index].day} and its ${days[index].sessions.length} session(s)?`)) return;
+    await persist(days.filter((_, position) => position !== index), 'Day removed.');
+  };
+  const saveSession = async (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    if (!sessionModal) return;
+    const next = days.map((day, index) => index !== sessionModal.dayIndex ? day : { ...day, sessions: sessionModal.index === null ? [...day.sessions, sessionModal.session] : day.sessions.map((session, position) => position === sessionModal.index ? sessionModal.session : session) });
+    if (await persist(next, sessionModal.index === null ? 'Session added.' : 'Session updated.')) setSessionModal(null);
+  };
+  const removeSession = async (dayIndex: number, index: number) => {
+    await persist(days.map((day, position) => position !== dayIndex ? day : { ...day, sessions: day.sessions.filter((_, sessionIndex) => sessionIndex !== index) }), 'Session removed.');
+  };
+  const newSession = (dayIndex: number) => setSessionModal({ dayIndex, index: null, session: { start: days[dayIndex].sessions.at(-1)?.end || '09:00', end: '', title: '', detail: '' } });
 
   return (
     <div className="grid gap-4">
-      <p className="text-sm text-ink/60">Delegates see today’s day first, with the session that is on now highlighted (Lagos time).</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-ink/60">Delegates see today first, with the current session highlighted (Lagos time).</p>
+        <button type="button" onClick={openNewDay} className={primaryButton}>+ Add day</button>
+      </div>
       {days.length === 0 && <div className={`${card} text-sm text-ink/55`}>No programme yet. Add the first day.</div>}
       {days.map((day, dayIndex) => (
-        <section key={dayIndex} className={card}>
-          <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)_auto] sm:items-end">
-            <Field title="Date"><input type="date" value={day.date ?? ''} onChange={(event) => updateDay(dayIndex, { date: event.target.value, day: event.target.value ? dayName(event.target.value) : day.day })} className={input} /></Field>
-            <Field title="Label"><input value={day.day} onChange={(event) => updateDay(dayIndex, { day: event.target.value })} className={input} placeholder="e.g. Day 1 · Tue 19" /></Field>
-            <button type="button" onClick={() => setDays((current) => current.filter((_, index) => index !== dayIndex))} className="rounded-full bg-[#fff0ee] px-4 py-2.5 text-xs font-bold text-coral">Remove day</button>
+        <section key={`${day.date}-${dayIndex}`} className={card}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div><strong className="text-base">{day.day}</strong><span className="ml-2 text-xs text-ink/50">{day.date}</span></div>
+            <div className="flex gap-1.5">
+              <button type="button" onClick={() => newSession(dayIndex)} className="rounded-full bg-[#03284a] px-3 py-1.5 text-xs font-bold text-white">+ Session</button>
+              <button type="button" onClick={() => setDayModal({ index: dayIndex, date: day.date, label: day.day })} className="rounded-full border border-ink/15 px-3 py-1.5 text-xs font-bold">Edit day</button>
+              <button type="button" disabled={saving} onClick={() => void removeDay(dayIndex)} className="rounded-full bg-[#fff0ee] px-3 py-1.5 text-xs font-bold text-coral">Remove</button>
+            </div>
           </div>
-          <div className="mt-4 grid gap-2">
-            {day.sessions.map((session, sessionIndex) => (
-              <div key={sessionIndex} className="grid gap-2 rounded-xl bg-[#f6f2e9] p-3 sm:grid-cols-[110px_110px_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
-                <input type="time" aria-label="Start" value={session.start ?? ''} onChange={(event) => updateSession(dayIndex, sessionIndex, 'start', event.target.value)} className={input} required />
-                <input type="time" aria-label="End" value={session.end ?? ''} onChange={(event) => updateSession(dayIndex, sessionIndex, 'end', event.target.value)} className={input} />
-                <input aria-label="Session title" value={session.title} onChange={(event) => updateSession(dayIndex, sessionIndex, 'title', event.target.value)} className={input} placeholder="Session title" />
-                <input aria-label="Details" value={session.detail ?? ''} onChange={(event) => updateSession(dayIndex, sessionIndex, 'detail', event.target.value)} className={input} placeholder="Hall, speaker… (optional)" />
-                <button type="button" onClick={() => updateDay(dayIndex, { sessions: day.sessions.filter((_, index) => index !== sessionIndex) })} className="grid h-10 w-10 place-items-center justify-self-end rounded-full bg-white text-lg text-ink/50 hover:text-coral" aria-label="Remove session">×</button>
-              </div>
+          <ul className="m-0 mt-3 grid list-none gap-1.5 p-0">
+            {day.sessions.length === 0 && <li className="rounded-xl bg-[#fafaf8] p-3 text-sm text-ink/50">No sessions yet.</li>}
+            {day.sessions.map((session, index) => (
+              <li key={index} className="grid items-center gap-2 rounded-xl bg-[#fafaf8] px-3 py-2.5 text-sm sm:grid-cols-[150px_minmax(0,1fr)_auto]">
+                <span className="font-bold">{to12h(session.start)}{session.end && <span className="font-normal text-ink/50"> – {to12h(session.end)}</span>}</span>
+                <span className="min-w-0"><strong className="block truncate">{session.title}</strong>{session.detail && <span className="block truncate text-xs text-ink/55">{session.detail}</span>}</span>
+                <span className="flex gap-2"><button type="button" onClick={() => setSessionModal({ dayIndex, index, session })} className="text-xs font-bold text-[#1469a9]">Edit</button><button type="button" disabled={saving} onClick={() => void removeSession(dayIndex, index)} className="text-xs font-bold text-coral">Remove</button></span>
+              </li>
             ))}
-          </div>
-          <button type="button" onClick={() => updateDay(dayIndex, { sessions: [...day.sessions, { start: day.sessions.at(-1)?.end || '09:00', end: '', title: '', detail: '' }] })} className="mt-3 rounded-full border border-ink/15 px-4 py-2 text-xs font-bold text-[#0b4779]">+ Add session</button>
+          </ul>
         </section>
       ))}
-      <button type="button" onClick={addDay} className="justify-self-start rounded-full bg-[#e7f1fa] px-5 py-2.5 text-sm font-bold text-[#0b4779]">+ Add day</button>
-      <SaveBar saving={saving} onSave={() => void save()} />
+
+      {dayModal && (
+        <Modal title={dayModal.index === null ? 'Add a programme day' : 'Edit day'} onClose={() => setDayModal(null)} size="sm" footer={<><button type="button" onClick={() => setDayModal(null)} className={secondaryButton}>Cancel</button><button type="submit" form="day-form" disabled={saving} className={primaryButton}>{saving ? 'Saving…' : 'Save day'}</button></>}>
+          <form id="day-form" onSubmit={saveDay} className="grid gap-4">
+            <Field title="Date"><input required type="date" value={dayModal.date} onChange={(change) => setDayModal({ ...dayModal, date: change.target.value, label: change.target.value ? dayName(change.target.value) : dayModal.label })} className={input} /></Field>
+            <Field title="Label shown to delegates"><input required value={dayModal.label} onChange={(change) => setDayModal({ ...dayModal, label: change.target.value })} className={input} placeholder="e.g. Day 1 · Tue 19" /></Field>
+          </form>
+        </Modal>
+      )}
+      {sessionModal && (
+        <Modal title={sessionModal.index === null ? `Add a session · ${days[sessionModal.dayIndex].day}` : 'Edit session'} onClose={() => setSessionModal(null)} footer={<><button type="button" onClick={() => setSessionModal(null)} className={secondaryButton}>Cancel</button><button type="submit" form="session-form" disabled={saving} className={primaryButton}>{saving ? 'Saving…' : 'Save session'}</button></>}>
+          <form id="session-form" onSubmit={saveSession} className="grid gap-4 sm:grid-cols-2">
+            <Field title="Starts"><input required type="time" value={sessionModal.session.start} onChange={(change) => setSessionModal({ ...sessionModal, session: { ...sessionModal.session, start: change.target.value } })} className={input} /></Field>
+            <Field title="Ends (optional)"><input type="time" value={sessionModal.session.end} onChange={(change) => setSessionModal({ ...sessionModal, session: { ...sessionModal.session, end: change.target.value } })} className={input} /></Field>
+            <Field title="Title" className="sm:col-span-2"><input required maxLength={120} value={sessionModal.session.title} onChange={(change) => setSessionModal({ ...sessionModal, session: { ...sessionModal.session, title: change.target.value } })} className={input} placeholder="Morning plenary" /></Field>
+            <Field title="Details (optional)" className="sm:col-span-2"><input maxLength={240} value={sessionModal.session.detail} onChange={(change) => setSessionModal({ ...sessionModal, session: { ...sessionModal.session, detail: change.target.value } })} className={input} placeholder="Main hall · Rev. Samson Ajetomobi" /></Field>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -159,37 +173,49 @@ function LiveEditor({ event, onSaved }: { event: AdminEvent; onSaved: (event: Ad
 
 function PublicityEditor({ event, onSaved }: { event: AdminEvent; onSaved: (event: AdminEvent) => void }) {
   const [caption, setCaption] = useState(event.publicity.caption ?? '');
-  const [assets, setAssets] = useState(event.publicity.assets ?? []);
+  const assets = event.publicity.assets ?? [];
+  const [modal, setModal] = useState<{ index: number | null; title: string; image: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const save = async () => {
-    const incomplete = assets.find((asset) => !asset.title.trim() || !asset.image.trim());
-    if (incomplete) { toast.warning('Every flyer needs a title and an image.'); return; }
+  const persist = async (nextAssets: { title: string; image: string }[], nextCaption: string, success: string) => {
     setSaving(true);
-    try {
-      const data = await api(`/admin/events/${event.slug}/content`, { method: 'PATCH', body: JSON.stringify({ publicity: { caption, assets } }) });
-      onSaved({ ...event, ...data.event, publicity: { caption: caption.trim() || null, assets } });
-      toast.success('Publicity kit saved.');
-    } catch (error) { toast.error(errorMessage(error, 'Could not save the publicity kit.')); } finally { setSaving(false); }
+    try { await saveContent(event, { publicity: { caption: nextCaption.trim() || null, assets: nextAssets } }, onSaved, success); return true; } catch (error) { toast.error(errorMessage(error, 'Could not save the publicity kit.')); return false; } finally { setSaving(false); }
   };
+  const saveAsset = async (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    if (!modal) return;
+    if (!modal.image) { toast.warning('Upload an image or paste a link.'); return; }
+    const asset = { title: modal.title.trim(), image: modal.image };
+    const next = modal.index === null ? [...assets, asset] : assets.map((item, index) => index === modal.index ? asset : item);
+    if (await persist(next, caption, modal.index === null ? 'Flyer added.' : 'Flyer updated.')) setModal(null);
+  };
+  const remove = async (index: number) => { if (window.confirm(`Remove ${assets[index].title}?`)) await persist(assets.filter((_, position) => position !== index), caption, 'Flyer removed.'); };
 
   return (
     <div className="grid gap-4">
-      <div className={card}>
-        <Field title="Share caption"><textarea value={caption} onChange={(event) => setCaption(event.target.value)} maxLength={600} className={`${input} min-h-24`} placeholder={`Leave empty to use: I'm attending ${event.title}… #MIV`} /></Field>
-        <p className="mt-1 text-right text-[11px] text-ink/40">{caption.length}/600</p>
+      <div className={`${card} grid gap-3`}>
+        <Field title="Share caption"><textarea value={caption} onChange={(change) => setCaption(change.target.value)} maxLength={600} className={`${input} min-h-20`} placeholder={`Leave empty to use: I'm attending ${event.title}… #MIV`} /></Field>
+        <div className="flex items-center justify-between"><span className="text-[11px] text-ink/40">{caption.length}/600</span><button type="button" disabled={saving || caption === (event.publicity.caption ?? '')} onClick={() => void persist(assets, caption, 'Caption saved.')} className={secondaryButton}>Save caption</button></div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+      <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-bold">Flyers ({assets.length})</h3><button type="button" onClick={() => setModal({ index: null, title: '', image: '' })} className={primaryButton}>+ Add flyer</button></div>
+      {assets.length === 0 && <div className={`${card} text-sm text-ink/55`}>No flyers yet.</div>}
+      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
         {assets.map((asset, index) => (
-          <div key={index} className={`${card} grid gap-3`}>
-            <ImageInput value={asset.image} onChange={(image) => setAssets((current) => current.map((item, position) => position === index ? { ...item, image } : item))} />
-            <input value={asset.title} onChange={(event) => setAssets((current) => current.map((item, position) => position === index ? { ...item, title: event.target.value } : item))} className={input} placeholder="Title, e.g. WhatsApp status" />
-            <button type="button" onClick={() => setAssets((current) => current.filter((_, position) => position !== index))} className="rounded-full bg-[#fff0ee] py-2 text-xs font-bold text-coral">Remove</button>
+          <div key={`${asset.image}-${index}`} className="rounded-[1.1rem] border border-ink/10 bg-white p-2">
+            <img src={asset.image} alt={asset.title} className="aspect-square w-full rounded-lg bg-[#f6f2e9] object-cover" />
+            <strong className="mt-2 block truncate px-1 text-sm">{asset.title}</strong>
+            <div className="mt-1 flex gap-3 px-1 pb-1"><button type="button" onClick={() => setModal({ index, ...asset })} className="text-xs font-bold text-[#1469a9]">Edit</button><button type="button" disabled={saving} onClick={() => void remove(index)} className="text-xs font-bold text-coral">Remove</button></div>
           </div>
         ))}
-        <button type="button" onClick={() => setAssets((current) => [...current, { title: '', image: '' }])} className="grid min-h-[200px] place-items-center rounded-[1.25rem] border-2 border-dashed border-ink/15 text-sm font-bold text-[#0b4779] hover:border-[#1469a9]">+ Add flyer</button>
       </div>
-      <SaveBar saving={saving} onSave={() => void save()} />
+      {modal && (
+        <Modal title={modal.index === null ? 'Add a flyer' : 'Edit flyer'} onClose={() => setModal(null)} size="sm" footer={<><button type="button" onClick={() => setModal(null)} className={secondaryButton}>Cancel</button><button type="submit" form="flyer-form" disabled={saving} className={primaryButton}>{saving ? 'Saving…' : 'Save flyer'}</button></>}>
+          <form id="flyer-form" onSubmit={saveAsset} className="grid gap-4">
+            <Field title="Image"><ImageInput value={modal.image} onChange={(image) => setModal({ ...modal, image })} /></Field>
+            <Field title="Title"><input required maxLength={80} value={modal.title} onChange={(change) => setModal({ ...modal, title: change.target.value })} className={input} placeholder="WhatsApp status" /></Field>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -197,50 +223,61 @@ function PublicityEditor({ event, onSaved }: { event: AdminEvent; onSaved: (even
 /* ------------------------------------------------------------------- Hotels */
 
 const emptyHotel = (): Hotel => ({ name: '', area: '', price: null, distance: '', conference_rate: false, phone: '', url: '', image: '', notes: '' });
+const cleanHotel = (hotel: Hotel) => ({ ...hotel, name: hotel.name.trim(), area: hotel.area || null, distance: hotel.distance || null, phone: hotel.phone || null, url: hotel.url || null, image: hotel.image || null, notes: hotel.notes || null });
 
 function HotelsEditor({ event, onSaved }: { event: AdminEvent; onSaved: (event: AdminEvent) => void }) {
-  const [offers, setOffers] = useState(event.offers_accommodation);
-  const [hotels, setHotels] = useState<Hotel[]>(() => event.hotels.map((hotel) => ({ ...emptyHotel(), ...hotel })));
+  const hotels = event.hotels;
+  const [modal, setModal] = useState<{ index: number | null; hotel: Hotel } | null>(null);
   const [saving, setSaving] = useState(false);
-  const update = (index: number, patch: Partial<Hotel>) => setHotels((current) => current.map((hotel, position) => position === index ? { ...hotel, ...patch } : hotel));
 
-  const save = async () => {
-    if (hotels.some((hotel) => !hotel.name.trim())) { toast.warning('Every hotel needs a name.'); return; }
+  const persist = async (body: Record<string, unknown>, success: string) => {
     setSaving(true);
-    try {
-      const payload = hotels.map((hotel) => ({ ...hotel, area: hotel.area || null, distance: hotel.distance || null, phone: hotel.phone || null, url: hotel.url || null, image: hotel.image || null, notes: hotel.notes || null }));
-      const data = await api(`/admin/events/${event.slug}/content`, { method: 'PATCH', body: JSON.stringify({ offers_accommodation: offers, hotels: payload }) });
-      onSaved({ ...event, ...data.event, publicity: event.publicity });
-      toast.success('Hotels saved.');
-    } catch (error) { toast.error(errorMessage(error, 'Could not save hotels.')); } finally { setSaving(false); }
+    try { await saveContent(event, body, onSaved, success); return true; } catch (error) { toast.error(errorMessage(error, 'Could not save hotels.')); return false; } finally { setSaving(false); }
   };
+  const saveHotel = async (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    if (!modal) return;
+    const next = modal.index === null ? [...hotels, modal.hotel] : hotels.map((hotel, index) => index === modal.index ? modal.hotel : hotel);
+    if (await persist({ hotels: next.map(cleanHotel) }, modal.index === null ? `${modal.hotel.name} added.` : `${modal.hotel.name} saved.`)) setModal(null);
+  };
+  const remove = async (index: number) => { if (window.confirm(`Remove ${hotels[index].name}?`)) await persist({ hotels: hotels.filter((_, position) => position !== index).map(cleanHotel) }, 'Hotel removed.'); };
+  const set = (patch: Partial<Hotel>) => setModal((current) => current && { ...current, hotel: { ...current.hotel, ...patch } });
 
   return (
     <div className="grid gap-4">
       <label className={`${card} flex items-center justify-between gap-4`}>
-        <span><strong className="block text-sm">Offer accommodation</strong><span className="text-xs text-ink/55">Shows the Hotels & travel section and lets onsite delegates ask for accommodation.</span></span>
-        <button type="button" role="switch" aria-checked={offers} onClick={() => setOffers((value) => !value)} className={`relative h-7 w-12 shrink-0 rounded-full transition ${offers ? 'bg-[#1469a9]' : 'bg-ink/20'}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${offers ? 'left-6' : 'left-1'}`} /></button>
+        <span><strong className="block text-sm">Offer accommodation</strong><span className="text-xs text-ink/55">Shows Hotels & travel on the dashboard and lets onsite delegates ask for accommodation.</span></span>
+        <button type="button" role="switch" aria-checked={event.offers_accommodation} disabled={saving} onClick={() => void persist({ offers_accommodation: !event.offers_accommodation }, event.offers_accommodation ? 'Accommodation turned off.' : 'Accommodation turned on.')} className={`relative h-7 w-12 shrink-0 rounded-full transition ${event.offers_accommodation ? 'bg-[#1469a9]' : 'bg-ink/20'}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${event.offers_accommodation ? 'left-6' : 'left-1'}`} /></button>
       </label>
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-bold">Hotels ({hotels.length})</h3><button type="button" onClick={() => setModal({ index: null, hotel: emptyHotel() })} className={primaryButton}>+ Add hotel</button></div>
+      <div className="overflow-hidden rounded-[1.25rem] border border-ink/10 bg-white">
+        {hotels.length === 0 && <p className="p-6 text-sm text-ink/55">No hotels yet.</p>}
         {hotels.map((hotel, index) => (
-          <div key={index} className={`${card} grid gap-4 sm:grid-cols-[160px_minmax(0,1fr)]`}>
-            <ImageInput value={hotel.image ?? ''} onChange={(image) => update(index, { image })} aspect="aspect-[4/3]" />
-            <div className="grid content-start gap-3 sm:grid-cols-2">
-              <Field title="Name" className="sm:col-span-2"><input value={hotel.name} onChange={(event) => update(index, { name: event.target.value })} className={input} /></Field>
-              <Field title="Area"><input value={hotel.area ?? ''} onChange={(event) => update(index, { area: event.target.value })} className={input} placeholder="Ojoo, Ibadan" /></Field>
-              <Field title="Distance"><input value={hotel.distance ?? ''} onChange={(event) => update(index, { distance: event.target.value })} className={input} placeholder="2.4 km" /></Field>
-              <Field title="Price per night (₦)"><input type="number" min="0" value={hotel.price ?? ''} onChange={(event) => update(index, { price: event.target.value === '' ? null : Number(event.target.value) })} className={input} /></Field>
-              <Field title="Phone / WhatsApp"><input value={hotel.phone ?? ''} onChange={(event) => update(index, { phone: event.target.value })} className={input} placeholder="+234…" /></Field>
-              <Field title="Website or booking link" className="sm:col-span-2"><input value={hotel.url ?? ''} onChange={(event) => update(index, { url: event.target.value })} className={input} placeholder="https://" /></Field>
-              <Field title="Notes" className="sm:col-span-2"><input value={hotel.notes ?? ''} onChange={(event) => update(index, { notes: event.target.value })} className={input} placeholder="Breakfast included, shuttle to venue…" /></Field>
-              <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={hotel.conference_rate} onChange={(event) => update(index, { conference_rate: event.target.checked })} className="h-4 w-4" />Conference rate</label>
-              <button type="button" onClick={() => setHotels((current) => current.filter((_, position) => position !== index))} className="justify-self-end rounded-full bg-[#fff0ee] px-4 py-2 text-xs font-bold text-coral">Remove hotel</button>
-            </div>
+          <div key={`${hotel.name}-${index}`} className="flex flex-wrap items-center gap-3 border-b border-ink/5 px-4 py-3 last:border-0">
+            <img src={hotel.image || '/images/photos/lp-hotel.webp'} alt="" className="h-12 w-16 shrink-0 rounded-lg object-cover" />
+            <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{hotel.name}{hotel.conference_rate && <span className="ml-2 rounded-full bg-[#e7f1fa] px-2 py-0.5 text-[10px] font-bold text-[#0b4779]">Conference rate</span>}</strong><span className="block truncate text-xs text-ink/50">{[hotel.area, hotel.distance, hotel.phone].filter(Boolean).join(' · ')}</span></span>
+            <strong className="text-sm">{hotel.price !== null ? `₦${hotel.price.toLocaleString()}` : '—'}</strong>
+            <span className="flex gap-3"><button type="button" onClick={() => setModal({ index, hotel: { ...emptyHotel(), ...hotel } })} className="text-xs font-bold text-[#1469a9]">Edit</button><button type="button" disabled={saving} onClick={() => void remove(index)} className="text-xs font-bold text-coral">Remove</button></span>
           </div>
         ))}
-        <button type="button" onClick={() => setHotels((current) => [...current, emptyHotel()])} className="grid min-h-[160px] place-items-center rounded-[1.25rem] border-2 border-dashed border-ink/15 text-sm font-bold text-[#0b4779] hover:border-[#1469a9]">+ Add hotel</button>
       </div>
-      <SaveBar saving={saving} onSave={() => void save()} />
+      {modal && (
+        <Modal title={modal.index === null ? 'Add a hotel' : `Edit ${modal.hotel.name}`} onClose={() => setModal(null)} size="lg" footer={<><button type="button" onClick={() => setModal(null)} className={secondaryButton}>Cancel</button><button type="submit" form="hotel-form" disabled={saving} className={primaryButton}>{saving ? 'Saving…' : 'Save hotel'}</button></>}>
+          <form id="hotel-form" onSubmit={saveHotel} className="grid gap-4 sm:grid-cols-[200px_minmax(0,1fr)]">
+            <Field title="Photo"><ImageInput value={modal.hotel.image ?? ''} onChange={(image) => set({ image })} aspect="aspect-[4/3]" /></Field>
+            <div className="grid content-start gap-3 sm:grid-cols-2">
+              <Field title="Name" className="sm:col-span-2"><input required value={modal.hotel.name} onChange={(change) => set({ name: change.target.value })} className={input} /></Field>
+              <Field title="Area"><input value={modal.hotel.area ?? ''} onChange={(change) => set({ area: change.target.value })} className={input} placeholder="Ojoo, Ibadan" /></Field>
+              <Field title="Distance to venue"><input value={modal.hotel.distance ?? ''} onChange={(change) => set({ distance: change.target.value })} className={input} placeholder="2.4 km" /></Field>
+              <Field title="Price per night (₦)"><input type="number" min="0" value={modal.hotel.price ?? ''} onChange={(change) => set({ price: change.target.value === '' ? null : Number(change.target.value) })} className={input} /></Field>
+              <Field title="Phone / WhatsApp"><input value={modal.hotel.phone ?? ''} onChange={(change) => set({ phone: change.target.value })} className={input} placeholder="+234…" /></Field>
+              <Field title="Website or booking link" className="sm:col-span-2"><input type="url" value={modal.hotel.url ?? ''} onChange={(change) => set({ url: change.target.value })} className={input} placeholder="https://" /></Field>
+              <Field title="Notes" className="sm:col-span-2"><input value={modal.hotel.notes ?? ''} onChange={(change) => set({ notes: change.target.value })} className={input} placeholder="Breakfast included, shuttle to venue…" /></Field>
+              <label className="flex items-center gap-2 text-sm font-semibold sm:col-span-2"><input type="checkbox" checked={modal.hotel.conference_rate} onChange={(change) => set({ conference_rate: change.target.checked })} className="h-4 w-4" />Offers a conference rate</label>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

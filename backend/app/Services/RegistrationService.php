@@ -91,6 +91,9 @@ class RegistrationService
     {
         $email = $user->email;
 
+        // Check the email limit before replacing the user's current code.
+        $this->emailService->ensureCanEmail($email);
+
         RegistrationOtp::where('user_id', $user->id)
             ->whereNull('verified_at')
             ->delete();

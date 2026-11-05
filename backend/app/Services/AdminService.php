@@ -94,13 +94,16 @@ class AdminService
     {
         $this->ensureAdmin($admin);
 
-        return Testimonial::with(['user:id,name,email', 'event:id,short_name'])->latest()->limit(100)->get()->map(fn (Testimonial $item): array => [
+        return Testimonial::with(['user:id,name,email', 'event:id,slug,short_name'])->latest()->limit(1000)->get()->map(fn (Testimonial $item): array => [
             'id' => $item->id,
             'name' => $item->show_name ? ($item->user?->name ?: 'A delegate') : 'A delegate',
             'email' => $item->user?->email,
             'content' => $item->content,
             'topic' => $item->topic,
             'event' => $item->event?->short_name,
+            'event_slug' => $item->event?->slug,
+            'show_name' => $item->show_name,
+            'published_at' => $item->published_at?->toIso8601String(),
             'status' => $item->status,
             'created_at' => $item->created_at?->toIso8601String(),
         ])->all();
@@ -121,12 +124,13 @@ class AdminService
     {
         $this->ensureAdmin($admin);
 
-        return Broadcast::latest()->limit(100)->get()->map(fn (Broadcast $broadcast): array => [
+        return Broadcast::latest()->limit(500)->get()->map(fn (Broadcast $broadcast): array => [
             'id' => $broadcast->id,
             'title' => $broadcast->title,
             'body' => $broadcast->body,
             'scheduled_at' => $broadcast->scheduled_at?->toIso8601String(),
             'status' => $broadcast->status,
+            'created_at' => $broadcast->created_at?->toIso8601String(),
         ])->all();
     }
 
@@ -158,6 +162,7 @@ class AdminService
                         new BroadcastMail($broadcast->title, $broadcast->body),
                         $email,
                         'broadcast-'.$broadcast->id.'-'.sha1($email),
+                        rateLimited: false,
                     );
                     $recipients++;
                 }
@@ -213,7 +218,7 @@ class AdminService
     {
         $this->ensureAdmin($admin);
 
-        return PartnerInquiry::query()->latest()->limit(100)->get()->all();
+        return PartnerInquiry::query()->latest()->limit(1000)->get()->all();
     }
 
     public function reviewPartnerInquiry(User $admin, PartnerInquiry $inquiry, string $status): array

@@ -7,6 +7,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Admin management of the content shown in each event's dashboard:
@@ -30,6 +31,7 @@ class EventContentService
                 ...$this->eventService->eventPayload($event),
                 'publicity' => $event->publicity ?? ['caption' => null, 'assets' => []],
                 'registrations_count' => $event->registrations_count,
+                'sort_order' => $event->sort_order,
             ])
             ->all();
     }
@@ -88,6 +90,68 @@ class EventContentService
         $event->update($attributes);
 
         return ['message' => "{$event->short_name} updated.", 'event' => $this->eventService->eventPayload($event->fresh())];
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes  Validated EventDetailsRequest data.
+     * @return array<string, mixed>
+     */
+    public function create(array $attributes): array
+    {
+        $event = Event::create($this->details($attributes));
+
+        return ['message' => "{$event->short_name} created.", 'event' => $this->adminPayload($event)];
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes  Validated EventDetailsRequest data.
+     * @return array<string, mixed>
+     */
+    public function updateDetails(Event $event, array $attributes): array
+    {
+        $event->update($this->details($attributes));
+
+        return ['message' => "{$event->short_name} saved.", 'event' => $this->adminPayload($event->fresh())];
+    }
+
+    /**
+     * Events people registered for can't be deleted; close registration instead.
+     *
+     * @return array{message: string}
+     */
+    public function delete(Event $event): array
+    {
+        if ($event->registrations()->exists()) {
+            throw ValidationException::withMessages(['event' => ["{$event->short_name} has registrations. Close registration instead of deleting it."]]);
+        }
+
+        $event->delete();
+
+        return ['message' => "{$event->short_name} deleted."];
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function details(array $attributes): array
+    {
+        $attributes['attendance_options'] = array_values(array_filter(array_map('trim', $attributes['attendance_options'] ?? [])));
+        $attributes['day_options'] = array_values(array_filter(array_map('trim', $attributes['day_options'] ?? [])));
+
+        return $attributes;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function adminPayload(Event $event): array
+    {
+        return [
+            ...$this->eventService->eventPayload($event),
+            'publicity' => $event->publicity ?? ['caption' => null, 'assets' => []],
+            'registrations_count' => $event->registrations()->count(),
+        ];
     }
 
     /**

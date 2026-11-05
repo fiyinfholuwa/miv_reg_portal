@@ -51,24 +51,6 @@ export const cardThemes = [
   { bg: '#ffffff', fg: '#0c0d10' },
 ];
 
-export const galleryItems: { src: string; event: string; caption: string; duration?: string }[] = [
-  { src: photo('lp-hero'), event: 'imlc', caption: 'Opening plenary' },
-  { src: photo('lp-about-1'), event: 'iylc', caption: 'IYLC breakout' },
-  { src: photo('lp-about-2'), event: 'bbr', caption: 'Worship at Bethel' },
-  { src: photo('lp-reg'), event: 'royal', caption: 'Royal Fathers arrive' },
-  { src: photo('lp-hotel'), event: 'family', caption: 'Family Life Day 2' },
-  { src: photo('lp-hero-m'), event: 'imlc', caption: 'Evening worship' },
-  { src: photo('lp-host-1'), event: 'imlc', caption: 'Rev. Samson ministering' },
-  { src: photo('lp-host-2'), event: 'bbr', caption: 'Rev. Stella teaching' },
-  { src: photo('lp-about-1'), event: 'awg', caption: 'Night of prayer' },
-  { src: photo('lp-reg'), event: 'academic', caption: 'Academic Banquet' },
-  { src: photo('lp-hero'), event: 'fire', caption: 'Let The Fire Fall' },
-  { src: photo('lp-about-2'), event: 'singles', caption: "Singles' Connect" },
-  { src: photo('lp-hero-m'), event: 'imlc', caption: 'IMLC 2026 highlights', duration: '1:48' },
-  { src: photo('lp-about-2'), event: 'bbr', caption: 'Bethel worship moment', duration: '0:52' },
-  { src: photo('lp-about-1'), event: 'iylc', caption: 'IYLC recap', duration: '1:12' },
-  { src: photo('lp-hotel'), event: 'family', caption: 'Family Life testimonies', duration: '2:05' },
-];
 
 export const fallbackProducts: HubProduct[] = [
   { name: 'Revival hoodie', price: 20000, image: '/images/merch/revival-hoodie.jpg', href: '/shop/revival-hoodie' },
@@ -104,6 +86,14 @@ export function useHubEvents() {
   }, []);
 
   return events;
+}
+
+/** The next upcoming event open for registration, if any has a date. */
+export function nextEvent(events: HubEvent[]) {
+  const now = Date.now();
+  return events
+    .filter((event) => event.registration_open && event.starts_at && Date.parse(event.starts_at) > now)
+    .sort((a, b) => Date.parse(a.starts_at as string) - Date.parse(b.starts_at as string))[0];
 }
 
 /** Slug of the next upcoming event that is open for registration. */

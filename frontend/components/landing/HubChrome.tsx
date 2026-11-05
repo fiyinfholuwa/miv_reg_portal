@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { apiUrl } from '../../lib/api';
 import { openRegistration, useHasSession } from './hub-data';
+import { useSiteContent } from '../../lib/site-content';
 
 const navLinks = [
   { label: 'Home', href: '/#top' },
@@ -109,11 +110,12 @@ export function HubNav({ registerSlug = 'imlc', variant = 'overlay' }: { registe
 }
 
 export function HubFooter() {
+  const { contact } = useSiteContent();
   return (
     <footer className="grid gap-10 border-t border-[#e4e7ec] px-5 py-12 sm:px-10 md:grid-cols-[2fr_1fr_2fr] md:gap-12 lg:px-[72px]">
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3"><img src="/images/miv-logo.png" alt="MIV" className="h-12 w-12 object-contain" /><span className="text-[17px] font-bold leading-[1.15] text-[#0c0d10]">The Men of<br />Issachar Vision Inc.</span></div>
-        <span className="text-sm text-[#4d5460]">© 2027 The Men of Issachar Vision Inc.</span>
+        <span className="text-sm text-[#4d5460]">{contact.copyright}</span>
       </div>
       <div className="flex flex-col gap-2.5 text-[15px] font-medium text-[#22262e]">
         <span className="text-sm font-bold text-[#0c0d10]">Explore</span>
@@ -124,18 +126,18 @@ export function HubFooter() {
       </div>
       <div className="flex flex-col gap-2.5 text-[15px] leading-normal text-[#22262e]">
         <span className="text-sm font-bold text-[#0c0d10]">Contact</span>
-        <a href="mailto:mivmandate2010@gmail.com" className="break-all hover:text-[#a82e26]">mivmandate2010@gmail.com</a>
-        <a href="tel:+2348080854818" className="hover:text-[#a82e26]">0808 085 4818</a>
-        <span>Leadership and Missions Conference Centre Olororo, Ojoo Ibadan, Nigeria</span>
+        {contact.email && <a href={`mailto:${contact.email}`} className="break-all hover:text-[#a82e26]">{contact.email}</a>}
+        {contact.phone && <a href={`tel:${contact.phone.replace(/[^0-9+]/g, '')}`} className="hover:text-[#a82e26]">{contact.phone}</a>}
+        {contact.address && <span>{contact.address}</span>}
       </div>
     </footer>
   );
 }
 
-const partnerTypes = ['Prayer partner', 'Financial partner', 'Conference sponsor', 'Volunteer & media'];
 
 export function PartnerModal({ close }: { close: () => void }) {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', organization: '', type: partnerTypes[1], message: '' });
+  const partnerTypes = useSiteContent().partner.types;
+  const [form, setForm] = useState({ name: '', email: '', phone: '', organization: '', type: partnerTypes[1] ?? partnerTypes[0] ?? 'Partner', message: '' });
   const [saving, setSaving] = useState(false);
   const update = (field: keyof typeof form, value: string) => setForm((current) => ({ ...current, [field]: value }));
 

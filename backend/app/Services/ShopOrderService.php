@@ -97,9 +97,30 @@ class ShopOrderService
         return ShopOrder::query()->with(['user:id,name,email', 'items'])->latest()->limit(200)->get()->map(fn (ShopOrder $order): array => [...$this->payload($order), 'user' => ['name' => $order->user?->name, 'email' => $order->user?->email]])->all();
     }
 
+    /**
+     * Marks a paid order as handed over at the store. Accepts the order or its pickup code.
+     *
+     * @return array<string, mixed>
+     */
+    public function collect(User $admin, string $pickupCode): array
+    {
+        $order = ShopOrder::query()->where('pickup_code', strtoupper(trim($pickupCode)))->with(['items', 'user:id,name,email'])->first();
+
+        if (! $order || $order->status !== 'paid') {
+            throw ValidationException::withMessages(['pickup_code' => ['No paid order with that pickup code.']]);
+        }
+        if ($order->collected_at) {
+            throw ValidationException::withMessages(['pickup_code' => ['This order was already collected on '.$order->collected_at->timezone('Africa/Lagos')->format('j M, g:i A').'.']]);
+        }
+
+        $order->update(['collected_at' => now(), 'collected_by' => $admin->id]);
+
+        return ['message' => "Order for {$order->user?->name} marked as collected.", 'order' => [...$this->payload($order->fresh('items')), 'user' => ['name' => $order->user?->name, 'email' => $order->user?->email]]];
+    }
+
     private function payload(ShopOrder $order): array
     {
-        return ['id' => $order->id, 'reference' => $order->reference, 'status' => $order->status, 'total' => $order->total, 'currency' => $order->currency, 'pickup_code' => $order->pickup_code, 'paid_at' => $order->paid_at?->toIso8601String(), 'created_at' => $order->created_at?->toIso8601String(), 'items' => $order->items->map(fn ($item): array => ['name' => $item->name, 'color' => $item->color, 'size' => $item->size, 'quantity' => $item->quantity, 'unit_price' => $item->unit_price, 'line_total' => $item->line_total])->all()];
+        return ['id' => $order->id, 'reference' => $order->reference, 'status' => $order->status, 'total' => $order->total, 'currency' => $order->currency, 'pickup_code' => $order->pickup_code, 'paid_at' => $order->paid_at?->toIso8601String(), 'collected_at' => $order->collected_at?->toIso8601String(), 'created_at' => $order->created_at?->toIso8601String(), 'items' => $order->items->map(fn ($item): array => ['name' => $item->name, 'color' => $item->color, 'size' => $item->size, 'quantity' => $item->quantity, 'unit_price' => $item->unit_price, 'line_total' => $item->line_total])->all()];
     }
 
     private function newPickupCode(): string

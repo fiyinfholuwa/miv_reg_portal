@@ -7,6 +7,7 @@ use App\Http\Requests\AdminLoginRequest;
 use App\Http\Requests\AdminUploadRequest;
 use App\Http\Requests\BroadcastRequest;
 use App\Http\Requests\EventContentRequest;
+use App\Http\Requests\EventDetailsRequest;
 use App\Http\Requests\PartnerInquiryReviewRequest;
 use App\Http\Requests\ReviewRequest;
 use App\Http\Requests\ShopProductRequest;
@@ -40,6 +41,27 @@ class AdminController extends Controller
         $this->adminService->ensureAdmin($request->user());
 
         return response()->json($this->eventContentService->update($event, $request->validated()));
+    }
+
+    public function createEvent(EventDetailsRequest $request): JsonResponse
+    {
+        $this->adminService->ensureAdmin($request->user());
+
+        return response()->json($this->eventContentService->create($request->validated()), 201);
+    }
+
+    public function updateEvent(EventDetailsRequest $request, Event $event): JsonResponse
+    {
+        $this->adminService->ensureAdmin($request->user());
+
+        return response()->json($this->eventContentService->updateDetails($event, $request->validated()));
+    }
+
+    public function deleteEvent(Request $request, Event $event): JsonResponse
+    {
+        $this->adminService->ensureAdmin($request->user());
+
+        return response()->json($this->eventContentService->delete($event));
     }
 
     public function upload(AdminUploadRequest $request): JsonResponse

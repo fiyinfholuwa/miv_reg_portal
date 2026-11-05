@@ -78,7 +78,7 @@ export default function EventWorkspace({ registration, profile, tab, welcome, go
       {tab === 'programme' && <ProgrammePanel event={event} />}
       {tab === 'live' && <LivePanel event={event} />}
       {tab === 'attending-card' && <section className="rounded-[1.75rem] bg-white p-5 shadow-sm sm:p-8"><p className="eyebrow">Share the invite</p><h2 className="mb-6 mt-2 font-display text-4xl uppercase text-[#03284a]">I will be attending</h2><AttendingCardStudio event={event} name={profile.name} hasSavedPhoto={profile.has_photo} onPhotoSaved={onPhotoSaved} /></section>}
-      {tab === 'team' && <TeamPanel registration={registration} />}
+      {tab === 'team' && <TeamPanel registration={registration} onChange={onRegistrationChange} />}
       {tab === 'publicity-kit' && <PublicityPanel event={event} go={go} />}
       {tab === 'testimonials' && <TestimonialsPanel event={event} />}
       {tab === 'hotels-travel' && <HotelsPanel event={event} />}
@@ -329,11 +329,66 @@ function LivePanel({ event }: { event: MivEvent }) {
   );
 }
 
-function TeamPanel({ registration }: { registration: EventRegistration }) {
-  const [copied, setCopied] = useState(false);
-  const code = registration.ticket_code.includes('DLG') ? registration.ticket_code.replace('DLG', 'TEAM') : `TEAM-${registration.ticket_code}`;
-  const copy = () => { void navigator.clipboard?.writeText(code); setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
-  return <div className="rounded-[1.75rem] bg-[#03284a] p-7 text-white sm:p-10"><p className="eyebrow text-[#ff7565]">{registration.event.short_name} team</p><h2 className="mt-3 font-display text-5xl uppercase">My team</h2><p className="mt-5 max-w-lg leading-7 text-[#dbe9f8]">Share your team code with your church or ministry delegates so the committee can keep everyone together at {registration.event.short_name}.</p><div className="mt-8 rounded-2xl bg-white p-5 text-ink"><p className="text-xs font-bold uppercase tracking-[.12em] text-ink/45">Your team code</p><div className="mt-2 flex items-center justify-between gap-3"><strong className="break-all font-display text-3xl text-[#0b4779] sm:text-4xl">{code}</strong><button type="button" onClick={copy} className="shrink-0 rounded-full bg-[#eaf3fb] px-4 py-2 text-xs font-bold text-[#0b4779]">{copied ? 'Copied' : 'Copy'}</button></div></div></div>;
+function TeamPanel({ registration, onChange }: { registration: EventRegistration; onChange: (registration: EventRegistration) => void }) {
+  const { event, team } = registration;
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const join = async (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    if (!code.trim()) return;
+    setBusy(true);
+    try {
+      const data = await api(`/auth/events/${event.slug}/team`, { method: 'POST', body: JSON.stringify({ code: code.trim() }) });
+      onChange({ ...registration, team: data.team });
+      setCode('');
+      toast.success(data.message);
+    } catch (error) { toast.error(errorMessage(error, 'Could not join that team.')); } finally { setBusy(false); }
+  };
+  const leave = async () => {
+    if (!team || !window.confirm(`Leave ${team.name}?`)) return;
+    setBusy(true);
+    try { const data = await api(`/auth/events/${event.slug}/team`, { method: 'DELETE' }); onChange({ ...registration, team: null }); toast.info(data.message); } catch (error) { toast.error(errorMessage(error, 'Could not leave the team.')); } finally { setBusy(false); }
+  };
+  const share = async () => {
+    if (!team) return;
+    const text = `Join our ${team.name} team for ${event.short_name}. Register, then enter team code ${team.code} under My team.`;
+    try { await navigator.clipboard.writeText(text); toast.success('Invite copied. Paste it in your group chat.'); } catch { toast.error('Copy is blocked in this browser.'); }
+  };
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <section className="rounded-[1.75rem] bg-[#03284a] p-6 text-white sm:p-8">
+        <p className="text-xs font-bold uppercase tracking-[.15em] text-[#9bc4e5]">{event.short_name} team</p>
+        {team ? (
+          <>
+            <h2 className="mt-2 text-2xl font-bold sm:text-3xl">{team.name}</h2>
+            <p className="mt-2 text-sm text-[#dbe9f8]">{team.members_count} member{team.members_count === 1 ? '' : 's'}{team.leader ? ` · Leader: ${team.leader}` : ''}</p>
+            {team.notes && <p className="mt-4 whitespace-pre-line rounded-xl bg-white/10 p-4 text-sm leading-6">{team.notes}</p>}
+            <div className="mt-6 rounded-2xl bg-white p-4 text-ink">
+              <span className="text-xs font-bold uppercase tracking-[.12em] text-ink/45">Team code</span>
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-3"><strong className="font-mono text-2xl tracking-[.08em] text-[#0b4779]">{team.code}</strong><button type="button" onClick={() => void share()} className="rounded-full bg-[#eaf3fb] px-4 py-2 text-xs font-bold text-[#0b4779]">Copy invite</button></div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {team.leader_phone && <a href={`https://wa.me/${team.leader_phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="rounded-full bg-white px-4 py-2 text-xs font-bold text-[#03284a]">Message team leader</a>}
+              <button type="button" onClick={() => void leave()} disabled={busy} className="rounded-full border border-white/30 px-4 py-2 text-xs font-bold">Leave team</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2 className="mt-2 text-2xl font-bold">You’re not in a team yet</h2>
+            <p className="mt-2 max-w-lg text-sm leading-6 text-[#dbe9f8]">Teams keep church and ministry delegates together at {event.short_name}. Ask your team leader for the team code, or the committee will assign you.</p>
+          </>
+        )}
+      </section>
+      <form onSubmit={join} className="h-fit rounded-[1.5rem] border border-ink/10 bg-white p-6">
+        <h3 className="text-lg font-bold">{team ? 'Switch team' : 'Join a team'}</h3>
+        <p className="mt-1 text-sm text-ink/55">Enter the code your team leader shared.</p>
+        <input value={code} onChange={(changeEvent) => setCode(changeEvent.target.value.toUpperCase())} className="mt-4 w-full rounded-xl border-2 border-ink/15 px-4 py-3 font-mono font-bold tracking-[.08em] outline-none focus:border-[#1469a9]" placeholder="e.g. IMLC-T1234" aria-label="Team code" />
+        <button type="submit" disabled={busy || !code.trim()} className="mt-3 w-full rounded-full bg-[#1469a9] px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? 'Joining…' : 'Join team'}</button>
+      </form>
+    </div>
+  );
 }
 
 function PublicityPanel({ event, go }: { event: MivEvent; go: (href: string) => void }) {
