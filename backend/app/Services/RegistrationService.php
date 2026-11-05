@@ -87,6 +87,21 @@ class RegistrationService
         return $this->sendOtp($user);
     }
 
+    /**
+     * Admin-triggered resend of the verification email (code + link).
+     * Subject to the same per-address email limit as self-service requests.
+     *
+     * @return array<string, mixed>
+     */
+    public function resendVerification(User $user): array
+    {
+        if ($user->email_verified_at !== null) {
+            throw ValidationException::withMessages(['email' => ["{$user->email} is already verified."]]);
+        }
+
+        return [...$this->sendOtp($user), 'message' => "Verification email sent to {$user->email}."];
+    }
+
     private function sendOtp(User $user): array
     {
         $email = $user->email;

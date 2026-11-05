@@ -42,6 +42,7 @@ Route::prefix('admin')->group(function (): void {
         Route::get('/overview', [AdminController::class, 'overview']);
         Route::get('/registrants', [AdminOperationsController::class, 'registrants']);
         Route::patch('/registrants/review', [AdminOperationsController::class, 'reviewRegistrants']);
+        Route::post('/registrants/{registrant}/resend-verification', [AdminOperationsController::class, 'resendVerification']);
         Route::get('/teams', [AdminOperationsController::class, 'teams']);
         Route::post('/teams', [AdminOperationsController::class, 'createTeam']);
         Route::patch('/teams/{team}', [AdminOperationsController::class, 'updateTeam']);

@@ -14,7 +14,7 @@ use Illuminate\Support\Carbon;
 class RegistrantService
 {
     /**
-     * @param  array{search?: string|null, status?: string|null, event?: string|null, role?: string|null, from?: string|null, to?: string|null, per_page?: int|string|null}  $filters
+     * @param  array{search?: string|null, status?: string|null, verified?: string|null, event?: string|null, role?: string|null, from?: string|null, to?: string|null, per_page?: int|string|null}  $filters
      * @return array{data: list<array<string, mixed>>, meta: array<string, int>, counts: array<string, int>}
      */
     public function paginate(array $filters): array
@@ -56,7 +56,12 @@ class RegistrantService
             ->map(fn ($total): int => (int) $total)
             ->all();
 
-        return ['all' => array_sum($counts), ...$counts];
+        $verified = $this->query([...$filters, 'status' => null, 'verified' => null])
+            ->selectRaw('email_verified_at is not null as is_verified, count(*) as total')
+            ->groupBy('is_verified')
+            ->pluck('total', 'is_verified');
+
+        return ['all' => array_sum($counts), ...$counts, 'verified' => (int) ($verified[1] ?? 0), 'unverified' => (int) ($verified[0] ?? 0)];
     }
 
     /**
@@ -76,6 +81,7 @@ class RegistrantService
                     ->orWhereHas('eventRegistrations', fn (Builder $registration) => $registration->where('ticket_code', 'like', $like)));
             })
             ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('approval_status', $status))
+            ->when($filters['verified'] ?? null, fn (Builder $query, string $verified) => $verified === 'yes' ? $query->whereNotNull('email_verified_at') : $query->whereNull('email_verified_at'))
             ->when($filters['role'] ?? null, fn (Builder $query, string $role) => $query->where('role', $role))
             ->when($filters['event'] ?? null, fn (Builder $query, string $slug) => $query->whereHas('eventRegistrations.event', fn (Builder $event) => $event->where('slug', $slug)))
             ->when($filters['from'] ?? null, fn (Builder $query, string $from) => $query->where('created_at', '>=', Carbon::parse($from, 'Africa/Lagos')->startOfDay()->utc()))
@@ -97,6 +103,7 @@ class RegistrantService
             'state_country' => $user->state_country,
             'approval_status' => $user->approval_status,
             'verified' => $user->email_verified_at !== null,
+            'verified_at' => $user->email_verified_at?->toIso8601String(),
             'created_at' => $user->created_at?->toIso8601String(),
             'events' => $user->eventRegistrations->map(fn (EventRegistration $registration): array => [
                 'registration_id' => $registration->id,

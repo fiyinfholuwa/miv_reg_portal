@@ -19,7 +19,8 @@ use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
- * All outgoing email goes through Elastic Email.
+ * All outgoing email goes through one provider, chosen with EMAIL_PROVIDER:
+ * "elasticemail" (default) or "smtp" (the MAIL_* settings, e.g. Gmail).
  *
  * - Each address can receive at most `services.elasticemail.per_recipient_per_minute`
  *   emails a minute (default 2), so codes can't be used to flood an inbox.
@@ -39,6 +40,12 @@ class EmailService
         if ($rateLimited) {
             $this->ensureCanEmail($recipient);
             RateLimiter::hit($this->rateKey($recipient), self::RATE_WINDOW_SECONDS);
+        }
+
+        if ($this->provider() === 'smtp' && ! app()->environment('testing')) {
+            $this->sendWithSmtp($mailable, $recipient);
+
+            return;
         }
 
         if (! $this->isConfigured()) {
@@ -118,6 +125,27 @@ class EmailService
             $emails->emailsTransactionalPost($message, $idempotencyKey);
         } catch (Throwable $exception) {
             Log::error('Elastic Email send failed', ['recipient' => $recipient, 'subject' => $subject, 'error' => $exception->getMessage()]);
+
+            throw ValidationException::withMessages([
+                'email' => ['We could not send the email right now. Please try again in a moment.'],
+            ])->status(503);
+        }
+    }
+
+    public function provider(): string
+    {
+        return config('services.email_provider') === 'smtp' ? 'smtp' : 'elasticemail';
+    }
+
+    /**
+     * Sends through Laravel's SMTP mailer (MAIL_HOST, MAIL_USERNAME, …).
+     */
+    private function sendWithSmtp(Mailable $mailable, string $recipient): void
+    {
+        try {
+            Mail::mailer('smtp')->to($recipient)->send($mailable);
+        } catch (Throwable $exception) {
+            Log::error('SMTP email send failed', ['recipient' => $recipient, 'error' => $exception->getMessage()]);
 
             throw ValidationException::withMessages([
                 'email' => ['We could not send the email right now. Please try again in a moment.'],

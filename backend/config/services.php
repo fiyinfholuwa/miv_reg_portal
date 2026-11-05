@@ -5,6 +5,9 @@ return [
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
     'registration_otp_expiry' => (int) env('REGISTRATION_OTP_EXPIRY', 10),
     'registration_token_years' => (int) env('REGISTRATION_TOKEN_YEARS', 5),
+    // "elasticemail" (default) or "smtp" to send through the MAIL_* settings (e.g. Gmail).
+    'email_provider' => env('EMAIL_PROVIDER', 'elasticemail'),
+
     'elasticemail' => [
         'api_key' => env('ELASTICEMAIL_API_KEY'),
         'from_address' => env('ELASTICEMAIL_FROM_ADDRESS', 'conference@menofissacharvision.com'),

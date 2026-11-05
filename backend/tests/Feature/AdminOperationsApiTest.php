@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\RegistrationOtpMail;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\ShopOrder;
@@ -9,6 +10,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class AdminOperationsApiTest extends TestCase
@@ -139,5 +141,26 @@ class AdminOperationsApiTest extends TestCase
         $this->withToken($token)->getJson('/api/admin/check-in/lookup?code=X')->assertForbidden();
         $this->withToken($token)->deleteJson("/api/admin/teams/{$team->id}")->assertForbidden();
         $this->withToken($token)->getJson('/api/admin/account')->assertForbidden();
+    }
+
+    public function test_admin_sees_who_verified_their_email_and_can_resend_the_code(): void
+    {
+        Mail::fake();
+        $verified = User::factory()->create(['name' => 'Verified Vic']);
+        $pending = User::factory()->unverified()->create(['name' => 'Pending Pat', 'email' => 'pat@example.com']);
+
+        $this->withToken($this->token)->getJson('/api/admin/registrants')
+            ->assertOk()->assertJsonPath('counts.verified', 1)->assertJsonPath('counts.unverified', 1);
+        $this->withToken($this->token)->getJson('/api/admin/registrants?verified=no')
+            ->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.name', 'Pending Pat')->assertJsonPath('data.0.verified', false)->assertJsonPath('data.0.verified_at', null);
+        $this->withToken($this->token)->getJson('/api/admin/registrants?verified=yes')->assertJsonPath('data.0.name', 'Verified Vic');
+
+        $this->withToken($this->token)->postJson("/api/admin/registrants/{$pending->id}/resend-verification")
+            ->assertOk()->assertJsonPath('message', 'Verification email sent to pat@example.com.');
+        Mail::assertSent(RegistrationOtpMail::class, fn (RegistrationOtpMail $mail): bool => $mail->hasTo('pat@example.com'));
+
+        $this->withToken($this->token)->postJson("/api/admin/registrants/{$verified->id}/resend-verification")->assertUnprocessable();
+        $this->withToken($this->token)->postJson("/api/admin/registrants/{$pending->id}/resend-verification")->assertOk();
+        $this->withToken($this->token)->postJson("/api/admin/registrants/{$pending->id}/resend-verification")->assertStatus(429);
     }
 }

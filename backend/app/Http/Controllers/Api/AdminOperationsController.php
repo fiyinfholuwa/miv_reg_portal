@@ -18,6 +18,7 @@ use App\Services\AdminAccountService;
 use App\Services\AdminService;
 use App\Services\CheckInService;
 use App\Services\RegistrantService;
+use App\Services\RegistrationService;
 use App\Services\ShopOrderService;
 use App\Services\TeamService;
 use Illuminate\Http\JsonResponse;
@@ -41,7 +42,7 @@ class AdminOperationsController extends Controller
     {
         $this->adminService->ensureAdmin($request->user());
 
-        return response()->json($this->registrantService->paginate($request->only(['search', 'status', 'event', 'role', 'from', 'to', 'per_page'])));
+        return response()->json($this->registrantService->paginate($request->only(['search', 'status', 'verified', 'event', 'role', 'from', 'to', 'per_page'])));
     }
 
     public function reviewRegistrants(BulkReviewRequest $request): JsonResponse
@@ -50,6 +51,14 @@ class AdminOperationsController extends Controller
         $count = $this->registrantService->review($request->validated('ids'), $request->validated('status'));
 
         return response()->json(['message' => $count === 1 ? '1 registrant updated.' : "{$count} registrants updated.", 'updated' => $count]);
+    }
+
+    public function resendVerification(Request $request, User $registrant, RegistrationService $registration): JsonResponse
+    {
+        $this->adminService->ensureAdmin($request->user());
+        abort_if($registrant->is_admin, 422, 'Admin accounts are not registrants.');
+
+        return response()->json($registration->resendVerification($registrant));
     }
 
     public function teams(Request $request): JsonResponse

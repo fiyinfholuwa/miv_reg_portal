@@ -8,7 +8,7 @@ import { Badge, DataTable, Modal, Pagination, StatusBadge, StatusTabs, TableTool
 
 type EventOption = { slug: string; short_name: string };
 type RegistrantEvent = { registration_id: number; slug: string; short_name: string; ticket_code: string; attendance_mode: string | null; team: string | null; checked_in_at: string | null };
-type Registrant = { id: number; name: string; email: string; phone: string | null; role: string | null; church: string | null; state_country: string | null; approval_status: string; verified: boolean; created_at: string | null; events: RegistrantEvent[] };
+type Registrant = { id: number; name: string; email: string; phone: string | null; role: string | null; church: string | null; state_country: string | null; approval_status: string; verified: boolean; verified_at: string | null; created_at: string | null; events: RegistrantEvent[] };
 type Meta = { page: number; last_page: number; per_page: number; total: number };
 
 const ROLES = ['Delegate', 'Minister', 'Leader', 'International delegate', 'Guest'];
@@ -22,15 +22,24 @@ export function useEventOptions() {
 
 /* ------------------------------------------------------------ Registrants */
 
-function RegistrantDetail({ person, onClose, onReview }: { person: Registrant; onClose: () => void; onReview: (ids: number[], status: string) => Promise<void> }) {
+function EmailBadge({ verified }: { verified: boolean }) {
+  return verified ? <Badge tone="green">✓ Email verified</Badge> : <Badge tone="amber">Email not verified</Badge>;
+}
+
+function RegistrantDetail({ person, onClose, onReview, onResend }: { person: Registrant; onClose: () => void; onReview: (ids: number[], status: string) => Promise<void>; onResend: (person: Registrant) => Promise<void> }) {
+  const [sending, setSending] = useState(false);
   return (
     <Modal title={person.name} subtitle={person.email} onClose={onClose} size="lg" footer={<>
       {person.approval_status !== 'rejected' && <button type="button" onClick={() => void onReview([person.id], 'rejected').then(onClose)} className={dangerButton}>Reject</button>}
       {person.approval_status !== 'approved' && <button type="button" onClick={() => void onReview([person.id], 'approved').then(onClose)} className={primaryButton}>Approve</button>}
     </>}>
       <dl className="grid gap-3 sm:grid-cols-2">
-        {[['Status', <StatusBadge key="s" status={person.approval_status} />], ['Phone', person.phone ?? '—'], ['Attends as', person.role ?? '—'], ['Church / ministry', person.church ?? '—'], ['State / country', person.state_country ?? '—'], ['Registered', formatDate(person.created_at, true)], ['Email verified', person.verified ? 'Yes' : 'No']].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-white p-3"><dt className="text-[11px] font-bold uppercase tracking-[.08em] text-ink/45">{label}</dt><dd className="m-0 mt-1 text-sm font-semibold">{value}</dd></div>)}
+        {[['Status', <StatusBadge key="s" status={person.approval_status} />], ['Phone', person.phone ?? '—'], ['Attends as', person.role ?? '—'], ['Church / ministry', person.church ?? '—'], ['State / country', person.state_country ?? '—'], ['Registered', formatDate(person.created_at, true)]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-white p-3"><dt className="text-[11px] font-bold uppercase tracking-[.08em] text-ink/45">{label}</dt><dd className="m-0 mt-1 text-sm font-semibold">{value}</dd></div>)}
       </dl>
+      <div className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl p-3 ${person.verified ? 'bg-[#eef8f1]' : 'bg-[#fff8e6]'}`}>
+        <div><EmailBadge verified={person.verified} /><p className="mt-1 text-xs text-ink/60">{person.verified ? `Confirmed ${formatDate(person.verified_at, true)}` : 'They have not entered the code or clicked the link we emailed. They cannot sign in until they do.'}</p></div>
+        {!person.verified && <button type="button" disabled={sending} onClick={() => { setSending(true); void onResend(person).finally(() => setSending(false)); }} className={secondaryButton}>{sending ? 'Sending…' : 'Resend verification email'}</button>}
+      </div>
       <h3 className="mt-5 text-sm font-bold">Events</h3>
       <div className="mt-2 grid gap-2">
         {person.events.length === 0 && <p className="text-sm text-ink/55">Not registered for any event yet.</p>}
@@ -83,10 +92,14 @@ export function RegistrantsView({ approvals = false }: { approvals?: boolean }) 
     } catch (error) { toast.error(errorMessage(error, 'Could not update registrants.')); }
   };
 
+  const resend = async (person: Registrant) => {
+    try { const data = await api(`/admin/registrants/${person.id}/resend-verification`, { method: 'POST' }); toast.success(data.message); } catch (error) { toast.error(errorMessage(error, 'Could not send the email.')); }
+  };
+
   const allSelected = rows.length > 0 && rows.every((row) => selected.includes(row.id));
   const columns: Column<Registrant>[] = [
     { key: 'select', header: <input type="checkbox" checked={allSelected} onChange={() => setSelected(allSelected ? [] : rows.map((row) => row.id))} aria-label="Select all on this page" className="h-4 w-4" />, cell: (row) => <input type="checkbox" checked={selected.includes(row.id)} onClick={(event) => event.stopPropagation()} onChange={() => setSelected((current) => current.includes(row.id) ? current.filter((id) => id !== row.id) : [...current, row.id])} aria-label={`Select ${row.name}`} className="h-4 w-4" />, className: 'w-10' },
-    { key: 'name', header: 'Name', cell: (row) => <div className="min-w-0"><strong className="block truncate">{row.name}</strong><span className="block truncate text-xs text-ink/50">{row.email}</span></div> },
+    { key: 'name', header: 'Name', cell: (row) => <div className="min-w-0"><strong className="block truncate">{row.name}</strong><span className="flex items-center gap-1.5 text-xs text-ink/50"><span className="truncate">{row.email}</span>{row.verified ? <span title={`Email verified ${formatDate(row.verified_at)}`} className="shrink-0 font-bold text-[#2f7d4f]">✓</span> : <span title="Email not verified" className="shrink-0 rounded-full bg-[#fff4d9] px-1.5 text-[10px] font-bold text-[#9a6814]">unverified</span>}</span></div> },
     { key: 'role', header: 'Attends as', cell: (row) => <span className="text-ink/70">{row.role ?? '—'}</span> },
     { key: 'events', header: 'Events', cell: (row) => <div className="flex flex-wrap justify-end gap-1 md:justify-start">{row.events.length ? row.events.map((event) => <Badge key={event.registration_id} tone="blue">{event.short_name}</Badge>) : <span className="text-xs text-ink/40">None</span>}</div> },
     { key: 'status', header: 'Status', cell: (row) => <StatusBadge status={row.approval_status} /> },
@@ -99,10 +112,15 @@ export function RegistrantsView({ approvals = false }: { approvals?: boolean }) 
 
   return (
     <div className="grid gap-4">
-      <StatusTabs options={STATUSES} value={filters.status ?? ''} onChange={(status) => setFilters((current) => ({ ...current, status }))} counts={counts} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <StatusTabs options={STATUSES} value={filters.status ?? ''} onChange={(status) => setFilters((current) => ({ ...current, status }))} counts={counts} />
+        <div className="flex gap-1.5 text-xs font-bold" role="group" aria-label="Email verification">
+          {[{ value: 'yes', label: `✓ ${counts.verified ?? 0} verified`, on: 'bg-[#2f7d4f] text-white', off: 'bg-[#dff2e5] text-[#2f7d4f]' }, { value: 'no', label: `${counts.unverified ?? 0} not verified`, on: 'bg-[#9a6814] text-white', off: 'bg-[#fff4d9] text-[#9a6814]' }].map((chip) => <button key={chip.value} type="button" aria-pressed={filters.verified === chip.value} onClick={() => setFilters((current) => ({ ...current, verified: current.verified === chip.value ? '' : chip.value }))} className={`rounded-full px-3 py-1.5 transition ${filters.verified === chip.value ? chip.on : chip.off}`}>{chip.label}</button>)}
+        </div>
+      </div>
       <TableToolbar
         query={query} onQuery={setQuery} placeholder="Name, email, phone, church or ticket code"
-        filters={[{ key: 'event', label: 'Event', options: events.map((event) => ({ value: event.slug, label: event.short_name })) }, { key: 'role', label: 'Attends as', options: ROLES.map((role) => ({ value: role, label: role })) }]}
+        filters={[{ key: 'verified', label: 'Email', options: [{ value: 'yes', label: 'Verified' }, { value: 'no', label: 'Not verified' }] }, { key: 'event', label: 'Event', options: events.map((event) => ({ value: event.slug, label: event.short_name })) }, { key: 'role', label: 'Attends as', options: ROLES.map((role) => ({ value: role, label: role })) }]}
         values={filters} onFilter={(key, value) => setFilters((current) => ({ ...current, [key]: value }))}
         dateRange={range} onDateRange={setRange} dateLabel="Registered"
         onReset={() => { setQuery(''); setFilters({ status: approvals ? 'pending' : '' }); setRange({ from: '', to: '' }); }}
@@ -115,7 +133,7 @@ export function RegistrantsView({ approvals = false }: { approvals?: boolean }) 
       )}
       <DataTable columns={columns} rows={rows} rowKey={(row) => row.id} loading={loading && rows.length === 0} onRowClick={setViewing} empty={approvals && !filters.event && !debounced ? 'No one is waiting for approval.' : 'No registrants match.'} />
       <Pagination page={meta.page} pages={meta.last_page} total={meta.total} pageSize={meta.per_page} onPage={setPage} onPageSize={setPerPage} />
-      {viewing && <RegistrantDetail person={viewing} onClose={() => setViewing(null)} onReview={review} />}
+      {viewing && <RegistrantDetail person={viewing} onClose={() => setViewing(null)} onReview={review} onResend={resend} />}
     </div>
   );
 }

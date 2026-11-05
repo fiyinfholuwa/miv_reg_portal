@@ -2,6 +2,8 @@
 
 import { errorMessage, toast } from '../../lib/toast';
 import { FormEvent, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { API_URL } from '../../lib/api';
 import { api } from './adminApi';
 import EventContentManager from './EventContentManager';
@@ -25,6 +27,19 @@ const navigation: { group: string; items: { label: AdminPage; icon: AdminIconNam
   { group: 'Shop', items: [{ label: 'Shop products', icon: 'tag' }, { label: 'Store orders', icon: 'bag' }] },
   { group: '', items: [{ label: 'Settings', icon: 'settings' }] },
 ];
+/** URL segment for each admin page: /admin/<slug>. Overview is /admin. */
+const PAGE_SLUGS: Record<AdminPage, string> = {
+  Overview: '', Registrants: 'registrants', Approvals: 'approvals', Teams: 'teams',
+  Events: 'events', 'Event content': 'event-content', Broadcasts: 'broadcasts', Testimonies: 'testimonies', 'Check-in & meals': 'check-in',
+  'Landing page': 'landing-page', 'Partner enquiries': 'partner-enquiries',
+  'Shop products': 'shop-products', 'Store orders': 'store-orders', Settings: 'settings',
+};
+const pageHref = (page: AdminPage) => `/admin${PAGE_SLUGS[page] ? `/${PAGE_SLUGS[page]}` : ''}`;
+const pageFromPath = (pathname: string): AdminPage | null => {
+  const slug = pathname.replace(/^\/admin\/?/, '').split('/')[0] ?? '';
+  return (Object.entries(PAGE_SLUGS).find(([, value]) => value === slug)?.[0] as AdminPage | undefined) ?? null;
+};
+
 const PAGE_HINTS: Partial<Record<AdminPage, string>> = {
   Events: 'Create events and choose what shows on the website.',
   'Event content': 'Programme, livestream, publicity kit and hotels for each event dashboard.',
@@ -35,7 +50,10 @@ const PAGE_HINTS: Partial<Record<AdminPage, string>> = {
 
 
 export default function AdminDashboardFunctional() {
-  const [active, setActive] = useState<AdminPage>('Overview');
+  const pathname = usePathname();
+  const router = useRouter();
+  const routed = pageFromPath(pathname);
+  const active: AdminPage = routed ?? 'Overview';
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loginRequired, setLoginRequired] = useState(false);
@@ -71,8 +89,12 @@ export default function AdminDashboardFunctional() {
     window.location.assign('/');
   };
 
+  // Unknown /admin/<thing> addresses fall back to the overview.
+  useEffect(() => { if (!routed) router.replace('/admin'); }, [routed, router]);
+  useEffect(() => { document.title = `${active} · MIV Admin`; setMobileNavOpen(false); }, [active]);
+
   const select = (page: AdminPage) => {
-    setActive(page);
+    router.push(pageHref(page));
     setMobileNavOpen(false);
   };
 
@@ -87,7 +109,7 @@ export default function AdminDashboardFunctional() {
       {/* Sidebar: fixed height, never scrolls on a normal screen. */}
       <aside className="hidden h-full w-[272px] shrink-0 flex-col bg-[#001a2d] px-4 py-5 text-white lg:flex">
         <Brand />
-        <AdminNav active={active} select={select} />
+        <AdminNav active={active} onNavigate={() => setMobileNavOpen(false)} />
         <button type="button" onClick={logout} className="mt-2 flex shrink-0 items-center gap-3 rounded-xl px-3 py-2 text-left text-[15px] font-semibold text-[#c6d7e6] hover:bg-white/10 hover:text-white"><AdminIcon name="logout" size={21} className="text-[#7f9ab2]" />Log out</button>
       </aside>
       <div className="flex h-full min-w-0 flex-1 flex-col">
@@ -125,7 +147,7 @@ export default function AdminDashboardFunctional() {
         <div className="fixed inset-0 z-50 bg-[#001428]/60 lg:hidden" onClick={() => setMobileNavOpen(false)}>
           <aside className="flex h-full w-[min(86vw,300px)] flex-col bg-[#001a2d] px-4 py-5 text-white" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between"><Brand /><button type="button" onClick={() => setMobileNavOpen(false)} className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-lg" aria-label="Close menu">×</button></div>
-            <AdminNav active={active} select={select} />
+            <AdminNav active={active} onNavigate={() => setMobileNavOpen(false)} />
             <button type="button" onClick={logout} className="mt-2 flex shrink-0 items-center gap-3 rounded-xl px-3 py-2 text-left text-[15px] font-semibold text-[#c6d7e6] hover:bg-white/10 hover:text-white"><AdminIcon name="logout" size={21} className="text-[#7f9ab2]" />Log out</button>
           </aside>
         </div>
@@ -151,13 +173,13 @@ function AdminLogin({ onLoggedIn }: { onLoggedIn: () => void }) {
 }
 
 function Brand({ light = false }: { light?: boolean }) { return <div className={`flex items-center gap-3 ${light ? 'text-[#03284a]' : 'text-white'}`}><span className="grid h-10 w-10 place-items-center rounded-full border border-[#9bc4e5]/40 bg-[#0a3557] text-xs font-bold">M</span><span className="font-display text-xl uppercase leading-none">MIV Admin</span></div>; }
-function AdminNav({ active, select }: { active: AdminPage; select: (page: AdminPage) => void }) {
+function AdminNav({ active, onNavigate }: { active: AdminPage; onNavigate: () => void }) {
   return (
     <nav className="no-scrollbar mt-6 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto" aria-label="Admin navigation">
       {navigation.map((section, index) => (
         <div key={index} className={section.group ? 'mt-3' : index > 0 ? 'mt-3' : ''}>
           {section.group && <p className="mb-1 px-3 text-[11px] font-bold uppercase tracking-[.16em] text-[#6f8aa3]">{section.group}</p>}
-          {section.items.map((item) => <button key={item.label} type="button" onClick={() => select(item.label)} aria-current={active === item.label ? 'page' : undefined} className={`flex w-full items-center gap-3 rounded-xl px-3 py-[7px] text-left text-[15px] font-semibold transition ${active === item.label ? 'bg-[#304457] text-white' : 'text-[#c6d7e6] hover:bg-white/10 hover:text-white'}`}><AdminIcon name={item.icon} size={21} className={active === item.label ? 'text-[#9bc4e5]' : 'text-[#7f9ab2]'} /><span className="flex-1">{item.label}</span></button>)}
+          {section.items.map((item) => <Link key={item.label} href={pageHref(item.label)} onClick={onNavigate} aria-current={active === item.label ? 'page' : undefined} className={`flex w-full items-center gap-3 rounded-xl px-3 py-[7px] text-left text-[15px] font-semibold transition ${active === item.label ? 'bg-[#304457] text-white' : 'text-[#c6d7e6] hover:bg-white/10 hover:text-white'}`}><AdminIcon name={item.icon} size={21} className={active === item.label ? 'text-[#9bc4e5]' : 'text-[#7f9ab2]'} /><span className="flex-1">{item.label}</span></Link>)}
         </div>
       ))}
     </nav>
