@@ -17,3 +17,5 @@ build/
 # macOS / editor files
 .DS_Store
 .vscode/
+.vercel
+.env*

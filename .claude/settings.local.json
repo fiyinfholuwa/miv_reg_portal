@@ -13,7 +13,20 @@
       "Bash(python3 /private/tmp/claude-501/-Users-macbook-Desktop-miv-reg-portal/b089e517-a1a9-41c4-a41d-a3060f20328d/scratchpad/migrate2.py)",
       "Bash(curl -s --max-time 20 http://localhost:3000/)",
       "Bash(lsof -nP -iTCP -sTCP:LISTEN)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(npx --yes vercel whoami)",
+      "Bash(python3 -c \"import json;d=json.load\\(open\\('.vercel/project.json'\\)\\);print\\('project:',d.get\\('projectName'\\)\\)\")",
+      "Bash(npx --yes vercel env ls)",
+      "Bash(python3 -c \"import json,sys;d=json.load\\(sys.stdin\\);print\\('root link ->',d.get\\('projectName'\\)\\)\")",
+      "Bash(npx --yes vercel project ls)",
+      "Bash(npx --yes vercel project inspect miv-reg-portal)",
+      "Bash(grep -iv \"^$\")",
+      "Bash(npx --yes vercel link --yes --project miv-reg-portal)",
+      "Bash(grep -v \"^$\")",
+      "Bash(npx --yes vercel env rm API_URL --yes)",
+      "Bash(npx --yes vercel env add API_URL production)",
+      "Bash(npx --yes vercel env add API_URL preview --yes)",
+      "Bash(npx --yes vercel redeploy https://miv-reg-portal-fucwo3iy5-fiyinfholuwas-projects.vercel.app --target production)"
     ]
   }
 }
