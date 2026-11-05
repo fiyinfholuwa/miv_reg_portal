@@ -1,0 +1,20 @@
+# Only needed when the web server's document root is this backend folder
+# (shared hosting where it can't be set to backend/public). Sends every
+# request into public/ and keeps .env, vendor/, storage/ etc. unreachable.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Never serve dotfiles (.env, .git, …).
+    RewriteRule (^|/)\. - [F,L]
+
+    # Pass the Authorization header through for API tokens.
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
