@@ -8,7 +8,6 @@ import { renderAttendingCard } from './attending-card';
 type Props = {
   event: MivEvent;
   name: string;
-  church?: string | null;
   hasSavedPhoto: boolean;
   /** Compact layout for the registration modal. */
   compact?: boolean;
@@ -21,15 +20,14 @@ const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
  * Upload a photo, preview the "I will be attending" card for one event, and
  * share it. The preview is the exact PNG that gets shared or downloaded.
  */
-export default function AttendingCardStudio({ event, name: initialName, church: initialChurch, hasSavedPhoto, compact = false, onPhotoSaved }: Props) {
+export default function AttendingCardStudio({ event, name: initialName, hasSavedPhoto, compact = false, onPhotoSaved }: Props) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [name, setName] = useState(initialName);
-  const [church, setChurch] = useState(initialChurch ?? '');
   const [cardUrl, setCardUrl] = useState<string | null>(null);
   const [cardBlob, setCardBlob] = useState<Blob | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const caption = `I will be attending ${event.title}${event.date_label !== 'Date TBA' ? ` (${event.date_label}${event.location ? `, ${event.location}` : ''})` : ''}. Register free and join me: ${eventPageUrl(event.slug)}`;
+  const caption = `I'll be at ${event.short_name}${event.date_label !== 'Date TBA' ? `, ${event.date_label}` : ''}. Join me 👉 ${eventPageUrl(event.slug)}`;
 
   // Load a previously saved photo once.
   useEffect(() => {
@@ -46,7 +44,7 @@ export default function AttendingCardStudio({ event, name: initialName, church: 
   useEffect(() => {
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      void renderAttendingCard({ name, church, eventTitle: event.title, dateLabel: event.date_label, location: event.location, photoUrl })
+      void renderAttendingCard({ name, eventTitle: event.title, dateLabel: event.date_label, location: event.location, photoUrl })
         .then((blob) => {
           if (cancelled) return;
           setCardBlob(blob);
@@ -55,7 +53,7 @@ export default function AttendingCardStudio({ event, name: initialName, church: 
         .catch((renderError) => !cancelled && toast.error(renderError instanceof Error ? renderError.message : 'Could not draw the card.'));
     }, 250);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [name, church, photoUrl, event.title, event.date_label, event.location]);
+  }, [name, photoUrl, event.title, event.date_label, event.location]);
 
   const choosePhoto = async (changeEvent: ChangeEvent<HTMLInputElement>) => {
     const file = changeEvent.target.files?.[0];
@@ -142,10 +140,7 @@ export default function AttendingCardStudio({ event, name: initialName, church: 
         </button>
 
         {!compact && (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm font-semibold text-[#22262e]">Name on card<input value={name} onChange={(changeEvent) => setName(changeEvent.target.value)} maxLength={60} className="mt-2 w-full rounded-xl border-[1.5px] border-[#c9ced6] bg-white px-4 py-3 outline-none focus:border-[#1460a1]" /></label>
-            <label className="block text-sm font-semibold text-[#22262e]">Church / ministry<input value={church} onChange={(changeEvent) => setChurch(changeEvent.target.value)} maxLength={80} className="mt-2 w-full rounded-xl border-[1.5px] border-[#c9ced6] bg-white px-4 py-3 outline-none focus:border-[#1460a1]" /></label>
-          </div>
+          <label className="mt-5 block max-w-md text-sm font-semibold text-[#22262e]">Name on card<input value={name} onChange={(changeEvent) => setName(changeEvent.target.value)} maxLength={60} className="mt-2 w-full rounded-xl border-[1.5px] border-[#c9ced6] bg-white px-4 py-3 outline-none focus:border-[#1460a1]" /></label>
         )}
 
         <div className="mt-5 flex flex-wrap gap-2">
@@ -156,7 +151,6 @@ export default function AttendingCardStudio({ event, name: initialName, church: 
           {socials.map((social) => <button key={social.label} type="button" onClick={() => openSocial(social.url)} disabled={!cardUrl} className="rounded-full bg-[#dceaf5] px-4 py-2 text-xs font-bold text-[#0c4c8a] hover:bg-[#bcd6ec] disabled:opacity-50">{social.label}</button>)}
           <button type="button" onClick={() => void copyCaption()} className="rounded-full bg-[#f4eddc] px-4 py-2 text-xs font-bold text-[#22262e]">Copy caption</button>
         </div>
-        {!compact && <p className="mt-4 rounded-xl bg-[#f4f5f7] p-3 text-sm leading-6 text-[#4d5460]">{caption}</p>}
         <p className="mt-3 text-xs text-[#6b7280]">On your phone, “Share card” sends the image straight to WhatsApp, Instagram and more. On a computer the card downloads so you can attach it.</p>
               </div>
     </div>

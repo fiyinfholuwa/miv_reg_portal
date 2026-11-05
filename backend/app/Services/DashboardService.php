@@ -28,6 +28,23 @@ class DashboardService
             ->all();
     }
 
+    /**
+     * Everything the user has shared (any status), newest first, so they can
+     * see what is still waiting for the media team.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function testimonialsBy(User $user, ?Event $event = null): array
+    {
+        return $user->testimonials()
+            ->when($event, fn ($query) => $query->where('event_id', $event->id))
+            ->with(['user:id,name,state_country,attendance_mode', 'event:id,short_name'])
+            ->latest()
+            ->get()
+            ->map(fn (Testimonial $testimonial): array => $this->testimonialPayload($testimonial))
+            ->all();
+    }
+
     public function submitTestimonial(User $user, array $attributes): array
     {
         $event = isset($attributes['event']) ? Event::where('slug', $attributes['event'])->firstOrFail() : null;
@@ -72,6 +89,8 @@ class DashboardService
             'quote' => $testimonial->content,
             'likes' => $testimonial->likes,
             'status' => $testimonial->status,
+            'show_name' => $testimonial->show_name,
+            'created_at' => $testimonial->created_at?->toIso8601String(),
         ];
     }
 }

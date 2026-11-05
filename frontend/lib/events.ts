@@ -3,6 +3,11 @@ import { apiUrl } from './api';
 export const SESSION_KEY = 'jan-conf-session';
 export const PRIMARY_EVENT_SLUG = 'imlc';
 
+/** `start`/`end` are 24h "HH:mm" in Lagos time; `time` is the legacy 12h label. */
+export type ProgrammeSession = { start?: string | null; end?: string | null; time?: string; title: string; detail?: string | null };
+export type ProgrammeDay = { day: string; date?: string | null; sessions: ProgrammeSession[] };
+export type Hotel = { name: string; area: string | null; price: number | null; distance: string | null; conference_rate: boolean; phone: string | null; url: string | null; image: string | null; notes: string | null };
+
 export type MivEvent = {
   id: number;
   slug: string;
@@ -18,9 +23,12 @@ export type MivEvent = {
   attendance_options: string[];
   day_options: string[];
   offers_accommodation: boolean;
-  programme: { day: string; sessions: { time: string; title: string; detail?: string }[] }[];
+  programme: ProgrammeDay[];
   stream_url: string | null;
+  stream_title: string | null;
+  stream_live: boolean;
   publicity: { caption: string; assets: { title: string; image: string }[] };
+  hotels: Hotel[];
   is_featured: boolean;
   registration_open: boolean;
 };

@@ -48,6 +48,9 @@ Route::prefix('admin')->group(function (): void {
         Route::get('/partner-inquiries', [AdminController::class, 'partnerInquiries']);
         Route::patch('/partner-inquiries/{inquiry}/review', [AdminController::class, 'reviewPartnerInquiry']);
         Route::get('/shop/orders', [AdminController::class, 'shopOrders']);
+        Route::get('/events', [AdminController::class, 'events']);
+        Route::patch('/events/{event}/content', [AdminController::class, 'updateEventContent']);
+        Route::post('/uploads', [AdminController::class, 'upload']);
     });
 });
 

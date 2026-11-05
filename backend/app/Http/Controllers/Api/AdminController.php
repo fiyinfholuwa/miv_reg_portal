@@ -4,22 +4,50 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AdminLoginRequest;
+use App\Http\Requests\AdminUploadRequest;
 use App\Http\Requests\BroadcastRequest;
-use App\Http\Requests\ReviewRequest;
+use App\Http\Requests\EventContentRequest;
 use App\Http\Requests\PartnerInquiryReviewRequest;
+use App\Http\Requests\ReviewRequest;
 use App\Http\Requests\ShopProductRequest;
-use App\Services\AdminService;
-use App\Services\ShopOrderService;
+use App\Models\Event;
 use App\Models\PartnerInquiry;
 use App\Models\ShopProduct;
 use App\Models\Testimonial;
 use App\Models\User;
+use App\Services\AdminService;
+use App\Services\EventContentService;
+use App\Services\ShopOrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AdminController extends Controller
 {
-    public function __construct(private readonly AdminService $adminService) {}
+    public function __construct(
+        private readonly AdminService $adminService,
+        private readonly EventContentService $eventContentService,
+    ) {}
+
+    public function events(Request $request): JsonResponse
+    {
+        $this->adminService->ensureAdmin($request->user());
+
+        return response()->json(['events' => $this->eventContentService->events()]);
+    }
+
+    public function updateEventContent(EventContentRequest $request, Event $event): JsonResponse
+    {
+        $this->adminService->ensureAdmin($request->user());
+
+        return response()->json($this->eventContentService->update($event, $request->validated()));
+    }
+
+    public function upload(AdminUploadRequest $request): JsonResponse
+    {
+        $this->adminService->ensureAdmin($request->user());
+
+        return response()->json($this->eventContentService->upload($request->file('image')), 201);
+    }
 
     public function login(AdminLoginRequest $request): JsonResponse
     {

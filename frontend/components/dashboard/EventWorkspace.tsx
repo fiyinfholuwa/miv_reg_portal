@@ -1,10 +1,12 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import AttendingCardStudio from '../attending/AttendingCardStudio';
-import { AccountUser, EventRegistration, MivEvent, PRIMARY_EVENT_SLUG, needsAttendanceStep, registerForEvent } from '../../lib/events';
-import { Countdown, Qr, api } from './ui';
-import { toast } from '../../lib/toast';
+import { AccountUser, EventRegistration, Hotel, MivEvent, eventPageUrl, needsAttendanceStep, registerForEvent } from '../../lib/events';
+import { SessionState, dayLabel, defaultDayIndex, formatTime, lagosNow, sessionStart, sessionStates } from '../../lib/programme';
+import Code128Barcode from '../shop/Code128Barcode';
+import { Countdown, api } from './ui';
+import { errorMessage, toast } from '../../lib/toast';
 import { Icon } from './DashboardChrome';
 
 export type EventTab = 'pass' | 'programme' | 'live' | 'attending-card' | 'team' | 'publicity-kit' | 'testimonials' | 'hotels-travel';
@@ -75,7 +77,7 @@ export default function EventWorkspace({ registration, profile, tab, welcome, go
       {tab === 'pass' && <PassPanel registration={registration} profile={profile} go={go} onRegistrationChange={onRegistrationChange} />}
       {tab === 'programme' && <ProgrammePanel event={event} />}
       {tab === 'live' && <LivePanel event={event} />}
-      {tab === 'attending-card' && <section className="rounded-[1.75rem] bg-white p-5 shadow-sm sm:p-8"><p className="eyebrow">Share the invite</p><h2 className="mb-6 mt-2 font-display text-4xl uppercase text-[#03284a]">I will be attending</h2><AttendingCardStudio event={event} name={profile.name} church={profile.church} hasSavedPhoto={profile.has_photo} onPhotoSaved={onPhotoSaved} /></section>}
+      {tab === 'attending-card' && <section className="rounded-[1.75rem] bg-white p-5 shadow-sm sm:p-8"><p className="eyebrow">Share the invite</p><h2 className="mb-6 mt-2 font-display text-4xl uppercase text-[#03284a]">I will be attending</h2><AttendingCardStudio event={event} name={profile.name} hasSavedPhoto={profile.has_photo} onPhotoSaved={onPhotoSaved} /></section>}
       {tab === 'team' && <TeamPanel registration={registration} />}
       {tab === 'publicity-kit' && <PublicityPanel event={event} go={go} />}
       {tab === 'testimonials' && <TestimonialsPanel event={event} />}
@@ -159,7 +161,7 @@ function SectionNav({ event, tab, go }: { event: MivEvent; tab: EventTab; go: (h
   );
 }
 
-function PassPanel({ registration, profile, go, onRegistrationChange }: { registration: EventRegistration; profile: AccountUser; go: (href: string) => void; onRegistrationChange: (registration: EventRegistration) => void }) {
+function PassPanel({ registration, profile, onRegistrationChange }: { registration: EventRegistration; profile: AccountUser; go: (href: string) => void; onRegistrationChange: (registration: EventRegistration) => void }) {
   const { event } = registration;
   const upcoming = event.starts_at && new Date(event.starts_at).getTime() > Date.now();
   const addToCalendar = () => {
@@ -172,22 +174,22 @@ function PassPanel({ registration, profile, go, onRegistrationChange }: { regist
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,480px)_minmax(0,1fr)]">
-      <section className="h-fit rounded-[1.75rem] bg-[#03284a] p-6 text-white sm:p-8">
-        <h2 className="font-display text-3xl uppercase">My pass</h2>
-        <p className="mt-1 text-xs font-bold uppercase tracking-[.12em] text-[#9bc4e5]">Show this at the welcome desk</p>
+      <section className="h-fit rounded-[1.75rem] bg-[#03284a] p-5 text-white sm:p-7">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-3xl uppercase">My pass</h2>
+          <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[.12em] text-[#9bc4e5]">Admit one</span>
+        </div>
+        <p className="mt-1 text-xs text-[#9bc4e5]">Show this barcode at the welcome desk.</p>
         <div className="mt-5 overflow-hidden rounded-[1.5rem] bg-white text-ink">
-          <div className="flex items-center justify-between gap-3 border-b border-dashed border-[#d9c99e] p-5"><div><p className="font-bold leading-tight">{event.short_name}</p><p className="text-xs text-ink/50">{event.date_label}{event.location ? ` · ${event.location}` : ''}</p></div><span className="text-xs font-bold text-[#1469a9]">ADMIT ONE</span></div>
-          <div className="flex justify-center p-7"><Qr seed={registration.ticket_code} /></div>
-          <p className="pb-6 text-center font-display text-2xl tracking-wide">{registration.ticket_code}</p>
+          <div className="border-b border-dashed border-[#d9c99e] p-5"><p className="font-bold leading-tight">{event.short_name}</p><p className="text-xs text-ink/50">{event.date_label}{event.location ? ` · ${event.location}` : ''}</p></div>
+          <div className="px-4 pt-5 sm:px-6"><Code128Barcode value={registration.ticket_code} height={110} /></div>
+          <p className="pb-5 pt-3 text-center font-mono text-lg font-bold tracking-[.16em] sm:text-xl">{registration.ticket_code}</p>
           <div className="grid grid-cols-3 border-t border-[#e7dcc1] text-xs"><div className="p-4"><span className="block uppercase text-ink/45">Name</span><strong className="mt-1 block break-words">{profile.name}</strong></div><div className="border-x border-[#e7dcc1] p-4"><span className="block uppercase text-ink/45">Type</span><strong className="mt-1 block">{profile.role || 'Delegate'}</strong></div><div className="p-4"><span className="block uppercase text-ink/45">Mode</span><strong className="mt-1 block">{registration.attendance_mode || '—'}</strong></div></div>
         </div>
       </section>
       <div className="grid content-start gap-6">
         {upcoming && event.starts_at && <section className="rounded-[1.75rem] bg-[#001b31] p-6 text-white sm:p-8"><p className="text-xs font-bold uppercase tracking-[.16em] text-[#9bc4e5]">Starts in</p><div className="mt-4"><Countdown startsAt={event.starts_at} compact /></div><button type="button" onClick={addToCalendar} className="mt-6 rounded-md bg-[#fffaf0] px-4 py-2 text-xs font-bold uppercase text-ink">Add to calendar</button></section>}
         {needsAttendanceStep(event) && <AttendanceForm registration={registration} onSaved={onRegistrationChange} />}
-        <section className="grid gap-3 sm:grid-cols-3">
-          {[['Attending card', 'attending-card', 'Upload your photo and share'], ['Programme', 'programme', 'Sessions and times'], ['Publicity kit', 'publicity-kit', 'Flyers and captions']].map(([title, slug, detail]) => <button key={slug} type="button" onClick={() => go(`/dashboard/events/${event.slug}/${slug}`)} className="rounded-[1.25rem] border border-ink/10 bg-white p-5 text-left shadow-sm hover:border-[#1469a9]"><strong className="block">{title}</strong><span className="mt-1 block text-sm text-ink/55">{detail}</span></button>)}
-        </section>
       </div>
     </div>
   );
@@ -225,34 +227,104 @@ function AttendanceForm({ registration, onSaved }: { registration: EventRegistra
   );
 }
 
+const STATE_STYLES: Record<SessionState, { card: string; badge?: string; label?: string }> = {
+  past: { card: 'border-ink/10 bg-white/60 opacity-60' },
+  now: { card: 'border-[#a82e26] bg-white shadow-[0_10px_30px_rgba(168,46,38,.12)] ring-1 ring-[#a82e26]/20', badge: 'bg-[#a82e26] text-white', label: 'Happening now' },
+  next: { card: 'border-[#1469a9] bg-white', badge: 'bg-[#e7f1fa] text-[#0b4779]', label: 'Up next' },
+  later: { card: 'border-ink/10 bg-white' },
+};
+
 function ProgrammePanel({ event }: { event: MivEvent }) {
-  const [day, setDay] = useState(event.programme[0]?.day ?? '');
-  const selected = event.programme.find((item) => item.day === day) ?? event.programme[0];
-  if (!selected) return <EmptyState title="Programme coming soon" text={`The ${event.short_name} programme will be published here closer to the date. We’ll also send updates by email.`} />;
+  const programme = event.programme;
+  const [now, setNow] = useState(() => lagosNow());
+  const [dayIndex, setDayIndex] = useState(() => defaultDayIndex(programme));
+
+  // Re-evaluate "now" every minute so the highlight moves through the day.
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(lagosNow()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  if (programme.length === 0) return <EmptyState title="Programme coming soon" text={`The ${event.short_name} programme will be published here closer to the date.`} />;
+
+  const day = programme[Math.min(dayIndex, programme.length - 1)];
+  const states = sessionStates(day, now);
+
   return (
-    <div>
-      {event.programme.length > 1 && <div className="mb-4 flex gap-2 overflow-x-auto pb-2">{event.programme.map((item) => <button key={item.day} type="button" onClick={() => setDay(item.day)} className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${item.day === selected.day ? 'bg-ink text-white' : 'bg-white text-ink/55'}`}>{item.day}</button>)}</div>}
-      <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase text-ink/45">{event.short_name}</p><h2 className="mt-1 font-display text-4xl uppercase">{selected.day}</h2></div>
-      <div className="mt-3 grid gap-3">{selected.sessions.map((session) => <article key={`${session.time}-${session.title}`} className="grid grid-cols-[80px_1fr] gap-4 rounded-2xl border-l-4 border-[#1469a9] bg-white p-5 shadow-sm"><strong className="font-display text-xl">{session.time}</strong><div><h3 className="font-display text-2xl uppercase">{session.title}</h3>{session.detail && <p className="mt-1 text-sm text-ink/55">{session.detail}</p>}</div></article>)}</div>
+    <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="no-scrollbar flex gap-2 overflow-x-auto xl:flex-col xl:overflow-visible" role="tablist" aria-label="Programme days">
+        {programme.map((item, index) => {
+          const selected = index === dayIndex;
+          const isToday = item.date === now.date;
+          const isPast = Boolean(item.date && item.date < now.date);
+          return (
+            <button key={`${item.date}-${item.day}`} type="button" role="tab" aria-selected={selected} onClick={() => setDayIndex(index)} className={`flex shrink-0 items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left transition xl:w-full ${selected ? 'bg-[#03284a] text-white' : 'bg-white text-ink ring-1 ring-ink/10 hover:ring-[#1469a9]/40'} ${isPast && !selected ? 'opacity-60' : ''}`}>
+              <span><strong className="block text-sm">{dayLabel(item)}</strong><span className={`block text-xs ${selected ? 'text-[#9bc4e5]' : 'text-ink/50'}`}>{item.sessions.length} session{item.sessions.length === 1 ? '' : 's'}</span></span>
+              {isToday && <span className="rounded-full bg-[#a82e26] px-2 py-0.5 text-[10px] font-bold uppercase text-white">Today</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      <div>
+        {day.sessions.length === 0 && <div className="rounded-2xl bg-white p-7 text-sm text-ink/60">Sessions for this day will be announced soon.</div>}
+        <ol className="m-0 grid list-none gap-3 p-0">
+          {day.sessions.map((session, index) => {
+            const style = STATE_STYLES[states[index]];
+            return (
+              <li key={`${sessionStart(session)}-${session.title}`} className={`grid grid-cols-[76px_minmax(0,1fr)] gap-3 rounded-2xl border-l-4 p-4 transition sm:grid-cols-[110px_minmax(0,1fr)] sm:gap-5 sm:p-5 ${style.card}`}>
+                <div>
+                  <strong className="block text-sm font-bold sm:text-base">{formatTime(sessionStart(session))}</strong>
+                  {session.end && <span className="block text-xs text-ink/50">to {formatTime(session.end)}</span>}
+                </div>
+                <div className="min-w-0">
+                  {style.label && <span className={`mb-1.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[.08em] ${style.badge}`}>{states[index] === 'now' && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />}{style.label}</span>}
+                  <h3 className="text-base font-bold leading-snug sm:text-lg">{session.title}</h3>
+                  {session.detail && <p className="mt-0.5 text-sm text-ink/55">{session.detail}</p>}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
     </div>
   );
 }
 
+/** YouTube video id from watch, youtu.be, live, embed or shorts links. */
+function youtubeId(url: string | null) {
+  return url?.match(/(?:youtu\.be\/|[?&]v=|\/live\/|\/embed\/|\/shorts\/)([\w-]{11})/)?.[1] ?? null;
+}
+
 function LivePanel({ event }: { event: MivEvent }) {
-  const youtubeId = event.stream_url?.match(/(?:youtu\.be\/|v=|\/live\/|\/embed\/)([\w-]{11})/)?.[1];
-  return (
-    <section className="overflow-hidden rounded-[1.75rem] bg-[#001b31] p-5 text-white sm:p-8">
-      <h2 className="font-display text-3xl uppercase">Live</h2>
-      {event.stream_url ? (
-        youtubeId
-          ? <div className="mt-6 aspect-video overflow-hidden rounded-2xl"><iframe className="h-full w-full" src={`https://www.youtube.com/embed/${youtubeId}`} title={`${event.title} livestream`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div>
-          : <a href={event.stream_url} target="_blank" rel="noreferrer" className="mt-6 inline-flex rounded-full bg-cream px-6 py-3 text-sm font-bold text-ink">Open the livestream →</a>
-      ) : (
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
+  const videoId = youtubeId(event.stream_url);
+  const title = event.stream_title || `${event.short_name} livestream`;
+
+  if (!event.stream_url) {
+    return (
+      <section className="overflow-hidden rounded-[1.75rem] bg-[#001b31] p-5 text-white sm:p-8">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-center">
           <div className="relative aspect-video overflow-hidden rounded-2xl bg-[#03284a]">{event.image && <img src={event.image} alt="" className="h-full w-full object-cover opacity-50" />}<span className="absolute left-4 top-4 rounded-full bg-white/15 px-4 py-2 text-xs font-bold uppercase backdrop-blur">Not live yet</span></div>
-          <div><p className="text-[#dbe9f8]">The livestream for {event.short_name} will appear here when it starts.</p>{event.starts_at && new Date(event.starts_at).getTime() > Date.now() && <div className="mt-5"><Countdown startsAt={event.starts_at} compact /></div>}</div>
+          <div><h2 className="text-xl font-bold">The stream will appear here</h2><p className="mt-2 text-[#dbe9f8]">Come back when {event.short_name} starts and watch right from your dashboard.</p>{event.starts_at && new Date(event.starts_at).getTime() > Date.now() && <div className="mt-5"><Countdown startsAt={event.starts_at} compact /></div>}</div>
         </div>
-      )}
+      </section>
+    );
+  }
+
+  return (
+    <section className="overflow-hidden rounded-[1.75rem] bg-[#001b31] p-3 text-white sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-2 pb-3 pt-1 sm:px-1">
+        <div className="flex min-w-0 items-center gap-3">
+          {event.stream_live
+            ? <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#e0352b] px-3 py-1 text-xs font-bold uppercase"><span className="h-2 w-2 animate-pulse rounded-full bg-white" />Live</span>
+            : <span className="shrink-0 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase">Replay</span>}
+          <h2 className="truncate text-base font-bold sm:text-lg">{title}</h2>
+        </div>
+        <a href={event.stream_url} target="_blank" rel="noreferrer" className="text-xs font-bold text-[#9bc4e5] hover:text-white">Open on {videoId ? 'YouTube' : 'stream site'} ↗</a>
+      </div>
+      {videoId
+        ? <div className="aspect-video overflow-hidden rounded-2xl bg-black"><iframe className="h-full w-full" src={`https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1${event.stream_live ? '&autoplay=1&mute=1' : ''}`} title={title} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen /></div>
+        : <a href={event.stream_url} target="_blank" rel="noreferrer" className="grid aspect-video place-items-center rounded-2xl bg-[#03284a] text-center"><span><span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white text-2xl text-[#03284a]">▶</span><span className="mt-3 block text-sm font-bold">Watch the stream</span></span></a>}
     </section>
   );
 }
@@ -266,56 +338,179 @@ function TeamPanel({ registration }: { registration: EventRegistration }) {
 
 function PublicityPanel({ event, go }: { event: MivEvent; go: (href: string) => void }) {
   const assets = event.publicity.assets;
-  const [selected, setSelected] = useState(assets[0]);
-  const [copied, setCopied] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const selected = assets[selectedIndex];
   const caption = event.publicity.caption;
-  const copy = () => { void navigator.clipboard?.writeText(caption); setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
+
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(caption); toast.success('Caption copied.'); } catch { toast.error('Copy is blocked in this browser.'); }
+  };
+
+  // Cross-origin images ignore the download attribute, so fetch them first.
+  const download = async () => {
+    if (!selected) return;
+    try {
+      const blob = await (await fetch(selected.image)).blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${event.short_name}-${selected.title}`.toLowerCase().replace(/[^a-z0-9]+/g, '-') + (blob.type.includes('png') ? '.png' : '.jpg');
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch {
+      window.open(selected.image, '_blank', 'noopener');
+    }
+  };
+
   return (
-    <div className="grid gap-7 2xl:grid-cols-[minmax(0,1fr)_440px]">
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        <button type="button" onClick={() => go(eventTabHref(event, 'attending-card'))} className="grid place-items-center rounded-[1.4rem] bg-[#03284a] p-6 text-center text-white shadow-sm"><span className="font-display text-3xl uppercase leading-none">Your attending card</span><span className="mt-3 text-sm text-[#9bc4e5]">Personalised with your photo →</span></button>
-        {assets.map((asset) => <button key={asset.title} type="button" onClick={() => setSelected(asset)} className={`rounded-[1.4rem] bg-white p-3 text-left shadow-sm ${selected?.title === asset.title ? 'ring-2 ring-[#1469a9]' : ''}`}><img src={asset.image} alt={asset.title} className="aspect-square w-full rounded-xl object-cover" /><strong className="mt-4 block">{asset.title}</strong><span className="mt-1 block text-sm text-ink/50">Ready to share</span></button>)}
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid content-start gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <button type="button" onClick={() => go(eventTabHref(event, 'attending-card'))} className="grid min-h-[180px] place-items-center rounded-[1.4rem] bg-[#03284a] p-6 text-center text-white"><span><Icon name="badge" size={28} className="mx-auto text-[#9bc4e5]" /><span className="mt-3 block text-lg font-bold">Your attending card</span><span className="mt-1 block text-sm text-[#9bc4e5]">Personalised with your photo →</span></span></button>
+        {assets.map((asset, index) => <button key={`${asset.title}-${index}`} type="button" onClick={() => setSelectedIndex(index)} aria-pressed={index === selectedIndex} className={`rounded-[1.4rem] bg-white p-2.5 text-left transition ${index === selectedIndex ? 'ring-2 ring-[#1469a9]' : 'ring-1 ring-ink/10 hover:ring-[#1469a9]/40'}`}><img src={asset.image} alt={asset.title} className="aspect-square w-full rounded-xl bg-[#f6f2e9] object-cover" loading="lazy" /><strong className="mt-3 block px-1 text-sm">{asset.title}</strong></button>)}
+        {assets.length === 0 && <div className="rounded-[1.4rem] bg-white p-6 text-sm text-ink/55 sm:col-span-2">Flyers for {event.short_name} will be added here by the media team.</div>}
       </div>
-      {selected && <aside className="h-fit rounded-[1.5rem] border border-ink/10 bg-white p-5 shadow-sm sm:p-7"><h2 className="font-display text-3xl uppercase">{selected.title}</h2><img src={selected.image} alt="" className="mt-5 aspect-square w-full rounded-xl object-cover" /><p className="mt-5 rounded-xl bg-[#f1f2f4] p-4 text-sm leading-6 text-ink/70">{caption}</p><div className="mt-4 grid grid-cols-2 gap-3"><button type="button" onClick={copy} className="rounded-full bg-[#1469a9] px-5 py-3 text-sm font-bold text-white">{copied ? 'Copied caption' : 'Copy caption'}</button><a href={selected.image} download className="rounded-full border border-ink/15 px-5 py-3 text-center text-sm font-bold text-[#0b4779]">Download</a></div><a href={`https://wa.me/?text=${encodeURIComponent(caption)}`} target="_blank" rel="noreferrer" className="mt-3 block rounded-full bg-[#dff2e5] px-5 py-3 text-center text-sm font-bold text-[#2f7d4f]">Share caption on WhatsApp</a></aside>}
+      <aside className="h-fit rounded-[1.5rem] border border-ink/10 bg-white p-5 sm:p-6 xl:sticky xl:top-20">
+        {selected && <><h2 className="text-lg font-bold">{selected.title}</h2><img src={selected.image} alt="" className="mt-4 aspect-square w-full rounded-xl bg-[#f6f2e9] object-contain" /></>}
+        <p className="mt-4 rounded-xl bg-[#f4f5f7] p-4 text-sm leading-6 text-ink/75">{caption}</p>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => void copy()} className="rounded-full bg-[#1469a9] px-4 py-3 text-sm font-bold text-white">Copy caption</button>
+          <button type="button" onClick={() => void download()} disabled={!selected} className="rounded-full border border-ink/15 px-4 py-3 text-sm font-bold text-[#0b4779] disabled:opacity-40">Download</button>
+        </div>
+        <a href={`https://wa.me/?text=${encodeURIComponent(`${caption} ${eventPageUrl(event.slug)}`)}`} target="_blank" rel="noreferrer" className="mt-2 block rounded-full bg-[#dff2e5] px-4 py-3 text-center text-sm font-bold text-[#2f7d4f]">Share on WhatsApp</a>
+      </aside>
     </div>
   );
 }
 
-type Story = { id: number; name: string; meta: string; tag: string; quote: string; likes: number };
+type Story = { id: number; name: string; meta: string; tag: string; quote: string; likes: number; status: string; created_at?: string | null };
+const TOPICS = ['Healing', 'Ministry', 'Family', 'Provision', 'Salvation', 'Other'];
+const MAX_TESTIMONY = 6000;
+const STORY_STATUS: Record<string, { label: string; className: string }> = {
+  pending: { label: 'Waiting for review', className: 'bg-[#fff4d9] text-[#9a6814]' },
+  published: { label: 'Published', className: 'bg-[#dff2e5] text-[#2f7d4f]' },
+  rejected: { label: 'Not published', className: 'bg-[#f1f2f4] text-ink/60' },
+};
 
 function TestimonialsPanel({ event }: { event: MivEvent }) {
   const [stories, setStories] = useState<Story[]>([]);
+  const [mine, setMine] = useState<Story[]>([]);
+  const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [topic, setTopic] = useState('Healing');
   const [showName, setShowName] = useState(true);
-  useEffect(() => { void api(`/auth/testimonials?event=${encodeURIComponent(event.slug)}`).then((data) => setStories(data.testimonials)).catch(() => undefined); }, [event.slug]);
-  const submit = async () => {
-    if (text.trim().length < 10) { toast.error('Please write at least 10 characters.'); return; }
+  const [sending, setSending] = useState(false);
+
+  const load = useCallback(() => api(`/auth/testimonials?event=${encodeURIComponent(event.slug)}`)
+    .then((data) => { setStories(data.testimonials ?? []); setMine(data.mine ?? []); })
+    .catch((error) => toast.error(errorMessage(error, 'Could not load testimonies.')))
+    .finally(() => setLoading(false)), [event.slug]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const submit = async (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
+    if (text.trim().length < 10) { toast.warning('Please write at least 10 characters.', { title: 'A little more detail' }); return; }
+    setSending(true);
     try {
-      await api('/auth/testimonials', { method: 'POST', body: JSON.stringify({ type: 'Write', content: text, topic, show_name: showName, event: event.slug }) });
+      await api('/auth/testimonials', { method: 'POST', body: JSON.stringify({ type: 'Write', content: text.trim(), topic, show_name: showName, event: event.slug }) });
       setText('');
-      toast.success('Thank you. Your testimony was sent to the media team for review.');
+      toast.success('The media team will review it before it is published.', { title: 'Testimony received' });
+      await load();
     } catch (submitError) {
-      toast.error(submitError instanceof Error ? submitError.message : 'Could not submit testimony.');
+      toast.error(errorMessage(submitError, 'Could not submit testimony.'));
+    } finally {
+      setSending(false);
     }
   };
+
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="grid content-start gap-4">
-        {stories.length === 0 && <div className="rounded-2xl bg-white p-7 text-sm text-ink/60">Published testimonies from {event.short_name} will appear here.</div>}
-        {stories.map((story) => <article key={story.id} className="rounded-[1.25rem] border border-ink/10 bg-white p-5 shadow-sm"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#eaf3fb] text-xs font-bold text-[#1469a9]">{story.name.slice(0, 2).toUpperCase()}</span><div><strong className="block text-sm">{story.name}</strong><span className="text-xs text-ink/50">{story.meta}</span></div><span className="ml-auto rounded-full bg-[#fff0ee] px-3 py-1 text-xs font-bold text-coral">{story.tag}</span></div><p className="mt-5 leading-7 text-ink/75">{story.quote}</p></article>)}
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid content-start gap-6">
+        {mine.length > 0 && (
+          <section>
+            <h2 className="mb-2 text-sm font-bold uppercase tracking-[.12em] text-ink/45">Your testimonies</h2>
+            <ul className="m-0 grid list-none gap-2 p-0">
+              {mine.map((story) => {
+                const status = STORY_STATUS[story.status] ?? STORY_STATUS.pending;
+                return <li key={story.id} className="rounded-2xl border border-ink/10 bg-white p-4"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${status.className}`}>{status.label}</span><span className="text-xs text-ink/45">{story.tag}{story.created_at ? ` · ${new Date(story.created_at).toLocaleDateString('en-NG', { dateStyle: 'medium' })}` : ''}</span></div><p className="mt-2 line-clamp-3 text-sm leading-6 text-ink/75">{story.quote}</p></li>;
+              })}
+            </ul>
+          </section>
+        )}
+        <section>
+          <h2 className="mb-2 text-sm font-bold uppercase tracking-[.12em] text-ink/45">From the {event.short_name} family</h2>
+          {loading && <div className="h-28 animate-pulse rounded-2xl bg-white" />}
+          {!loading && stories.length === 0 && <div className="rounded-2xl bg-white p-7 text-sm text-ink/60">No published testimonies yet. Be the first to share what God did.</div>}
+          <div className="grid gap-3 lg:grid-cols-2">
+            {stories.map((story) => <article key={story.id} className="rounded-[1.25rem] border border-ink/10 bg-white p-5"><div className="flex items-center gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#eaf3fb] text-xs font-bold text-[#1469a9]">{story.name.slice(0, 2).toUpperCase()}</span><div className="min-w-0"><strong className="block truncate text-sm">{story.name}</strong><span className="block truncate text-xs text-ink/50">{story.meta}</span></div><span className="ml-auto shrink-0 rounded-full bg-[#fff0ee] px-3 py-1 text-xs font-bold text-coral">{story.tag}</span></div><p className="mt-4 leading-7 text-ink/75">{story.quote}</p></article>)}
+          </div>
+        </section>
       </div>
-      <aside className="h-fit rounded-[1.5rem] bg-[#03284a] p-6 text-white"><p className="text-xs font-bold uppercase tracking-[.15em] text-[#9bc4e5]">Share your story</p><h2 className="mt-3 font-display text-3xl uppercase">What did God do at {event.short_name}?</h2><textarea value={text} onChange={(changeEvent) => setText(changeEvent.target.value)} className="mt-5 min-h-36 w-full rounded-xl p-4 text-ink" placeholder="Tell us what God did..." /><div className="mt-4 flex flex-wrap gap-2">{['Healing', 'Ministry', 'Family', 'Provision', 'Salvation'].map((item) => <button key={item} type="button" onClick={() => setTopic(item)} className={topic === item ? 'rounded-full bg-white px-3 py-2 text-xs font-bold text-[#0b4779]' : 'rounded-full border border-white/30 px-3 py-2 text-xs font-bold'}>{item}</button>)}</div><label className="mt-5 flex items-center gap-3 text-sm"><input type="checkbox" checked={showName} onChange={(changeEvent) => setShowName(changeEvent.target.checked)} /> Show my name</label><button type="button" onClick={() => void submit()} className="mt-6 w-full rounded-full bg-white px-5 py-3 text-sm font-bold text-[#0b4779]">Send to media team</button></aside>
+      <form onSubmit={submit} className="h-fit rounded-[1.5rem] bg-[#03284a] p-5 text-white sm:p-6 xl:sticky xl:top-20">
+        <p className="text-xs font-bold uppercase tracking-[.15em] text-[#9bc4e5]">Share your story</p>
+        <h2 className="mt-2 text-xl font-bold">What did God do at {event.short_name}?</h2>
+        <textarea value={text} onChange={(changeEvent) => setText(changeEvent.target.value.slice(0, MAX_TESTIMONY))} className="mt-4 min-h-36 w-full rounded-xl p-4 text-ink outline-none" placeholder="Tell us what God did..." aria-label="Your testimony" />
+        <p className="mt-1 text-right text-[11px] text-[#9bc4e5]">{text.length}/{MAX_TESTIMONY}</p>
+        <div className="mt-2 flex flex-wrap gap-2">{TOPICS.map((item) => <button key={item} type="button" aria-pressed={topic === item} onClick={() => setTopic(item)} className={topic === item ? 'rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[#0b4779]' : 'rounded-full border border-white/30 px-3 py-1.5 text-xs font-bold'}>{item}</button>)}</div>
+        <label className="mt-4 flex items-center gap-3 text-sm"><input type="checkbox" checked={showName} onChange={(changeEvent) => setShowName(changeEvent.target.checked)} className="h-4 w-4" /> Show my name when published</label>
+        <button type="submit" disabled={sending} className="mt-5 w-full rounded-full bg-white px-5 py-3 text-sm font-bold text-[#0b4779] disabled:opacity-60">{sending ? 'Sending…' : 'Send to media team'}</button>
+      </form>
     </div>
   );
 }
 
+const PRICE_FILTERS = [
+  { label: 'All', test: () => true },
+  { label: 'Under ₦20k', test: (hotel: Hotel) => hotel.price !== null && hotel.price < 20000 },
+  { label: '₦20k–₦35k', test: (hotel: Hotel) => hotel.price !== null && hotel.price >= 20000 && hotel.price <= 35000 },
+  { label: 'Over ₦35k', test: (hotel: Hotel) => hotel.price !== null && hotel.price > 35000 },
+  { label: 'Conference rate', test: (hotel: Hotel) => hotel.conference_rate },
+];
+
 function HotelsPanel({ event }: { event: MivEvent }) {
-  const hotels = [{ name: 'Olororo Guest Lodge', area: 'Olororo, Ojoo', price: 18000, distance: '0.8 km', rate: true }, { name: 'Ojoo Grand Hotel', area: 'Ojoo roundabout', price: 25000, distance: '2.4 km', rate: false }, { name: 'Moniya Suites', area: 'Oyo Road, Moniya', price: 15000, distance: '5.1 km', rate: false }, { name: 'Bodija Executive Inn', area: 'Bodija, Ibadan', price: 35000, distance: '9.6 km', rate: false }];
   const [filter, setFilter] = useState('All');
-  const filtered = hotels.filter((hotel) => filter === 'All' || (filter === 'Under ₦20k' && hotel.price < 20000) || (filter === '₦20k–₦35k' && hotel.price >= 20000 && hotel.price <= 35000) || (filter === 'Conference rate' && hotel.rate));
-  if (event.slug !== PRIMARY_EVENT_SLUG) return <EmptyState title="Hotels coming soon" text={`Recommended places to stay for ${event.short_name} will be listed here once the venue is confirmed.`} />;
-  return <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,.7fr)]"><div><div className="flex gap-2 overflow-x-auto pb-2">{['All', 'Under ₦20k', '₦20k–₦35k', 'Conference rate'].map((item) => <button key={item} type="button" onClick={() => setFilter(item)} className={filter === item ? 'shrink-0 rounded-full bg-ink px-4 py-2 text-xs font-bold text-white' : 'shrink-0 rounded-full border-2 border-ink/15 bg-white px-4 py-2 text-xs font-bold text-ink/65'}>{item}</button>)}</div><div className="mt-5 grid gap-5 sm:grid-cols-2">{filtered.map((hotel) => <article key={hotel.name} className="rounded-[1.4rem] border border-ink/10 bg-white p-3 shadow-sm"><div className="relative aspect-[1.35] overflow-hidden rounded-xl bg-[#e7edf3]"><img src="/images/photos/lp-hotel.webp" alt={`${hotel.name} accommodation`} className="h-full w-full object-cover" /><span className="absolute left-3 top-3 rounded-full bg-white px-3 py-2 text-xs font-bold">{hotel.distance}</span>{hotel.rate && <span className="absolute right-3 top-3 rounded-full bg-[#1469a9] px-3 py-2 text-xs font-bold text-white">Conference rate</span>}</div><div className="mt-4 flex items-start justify-between gap-3"><div><h3 className="font-bold">{hotel.name}</h3><p className="mt-1 text-sm text-ink/50">{hotel.area}</p></div><strong className="text-[#0b4779]">₦{hotel.price.toLocaleString()}<span className="block text-right text-xs font-normal text-ink/45">per night</span></strong></div></article>)}</div></div><aside className="grid min-h-[360px] place-items-center rounded-[1.5rem] border-2 border-dashed border-ink/20 bg-[#e7edf3] p-6 text-center text-ink/50"><div><span className="text-4xl">⌖</span><p className="mt-3 text-sm font-semibold">Hotels around the venue</p><button type="button" onClick={() => window.open('https://maps.google.com/?q=Leadership+Missions+Conference+Centre+Ibadan', '_blank')} className="mt-5 rounded-full bg-[#1469a9] px-5 py-3 text-sm font-bold text-white">Open directions</button></div></aside></div>;
+  const hotels = event.hotels ?? [];
+  if (hotels.length === 0) return <EmptyState title="Hotels coming soon" text={`Recommended places to stay for ${event.short_name} will be listed here once confirmed.`} />;
+  const filters = PRICE_FILTERS.filter((item) => item.label === 'All' || hotels.some(item.test));
+  const shown = hotels.filter(PRICE_FILTERS.find((item) => item.label === filter)?.test ?? (() => true));
+  const directions = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location || event.title)}`;
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div>
+        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">{filters.map((item) => <button key={item.label} type="button" aria-pressed={filter === item.label} onClick={() => setFilter(item.label)} className={filter === item.label ? 'shrink-0 rounded-full bg-[#03284a] px-4 py-2 text-xs font-bold text-white' : 'shrink-0 rounded-full bg-white px-4 py-2 text-xs font-bold text-ink/65 ring-1 ring-ink/10'}>{item.label}</button>)}</div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+          {shown.length === 0 && <p className="rounded-2xl bg-white p-6 text-sm text-ink/55 sm:col-span-2">No hotels match this filter.</p>}
+          {shown.map((hotel) => (
+            <article key={hotel.name} className="flex flex-col rounded-[1.4rem] border border-ink/10 bg-white p-3">
+              <div className="relative aspect-[1.5] overflow-hidden rounded-xl bg-[#e7edf3]">
+                <img src={hotel.image || '/images/photos/lp-hotel.webp'} alt={hotel.name} className="h-full w-full object-cover" loading="lazy" />
+                {hotel.distance && <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1 text-xs font-bold">{hotel.distance}</span>}
+                {hotel.conference_rate && <span className="absolute right-3 top-3 rounded-full bg-[#1469a9] px-3 py-1 text-xs font-bold text-white">Conference rate</span>}
+              </div>
+              <div className="mt-3 flex items-start justify-between gap-3 px-1">
+                <div className="min-w-0"><h3 className="font-bold leading-snug">{hotel.name}</h3>{hotel.area && <p className="mt-0.5 text-sm text-ink/50">{hotel.area}</p>}</div>
+                {hotel.price !== null && <strong className="shrink-0 text-right text-[#0b4779]">₦{hotel.price.toLocaleString()}<span className="block text-xs font-normal text-ink/45">per night</span></strong>}
+              </div>
+              {hotel.notes && <p className="mt-2 px-1 text-sm text-ink/60">{hotel.notes}</p>}
+              <div className="mt-auto flex flex-wrap gap-2 px-1 pt-4">
+                {hotel.phone && <a href={`tel:${hotel.phone.replace(/\s+/g, '')}`} className="rounded-full bg-[#03284a] px-4 py-2 text-xs font-bold text-white">Call</a>}
+                {hotel.phone && <a href={`https://wa.me/${hotel.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello, I'm attending ${event.short_name} and would like to book a room.`)}`} target="_blank" rel="noreferrer" className="rounded-full bg-[#dff2e5] px-4 py-2 text-xs font-bold text-[#2f7d4f]">WhatsApp</a>}
+                {hotel.url && <a href={hotel.url} target="_blank" rel="noreferrer" className="rounded-full border border-ink/15 px-4 py-2 text-xs font-bold text-[#0b4779]">Website ↗</a>}
+                <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${hotel.name} ${hotel.area ?? ''}`)}`} target="_blank" rel="noreferrer" className="rounded-full border border-ink/15 px-4 py-2 text-xs font-bold text-[#0b4779]">Map ↗</a>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+      <aside className="h-fit rounded-[1.5rem] bg-[#03284a] p-6 text-white xl:sticky xl:top-20">
+        <Icon name="bed" size={28} className="text-[#9bc4e5]" />
+        <h2 className="mt-3 text-lg font-bold">Staying near the venue</h2>
+        <p className="mt-2 text-sm leading-6 text-[#dbe9f8]">Book directly with the hotel. Mention {event.short_name} to ask for the conference rate where offered.</p>
+        {event.location && <p className="mt-4 rounded-xl bg-white/10 p-3 text-sm">{event.location}</p>}
+        <a href={directions} target="_blank" rel="noreferrer" className="mt-4 block rounded-full bg-white px-5 py-3 text-center text-sm font-bold text-[#03284a]">Directions to venue ↗</a>
+      </aside>
+    </div>
+  );
 }
 
 function EmptyState({ title, text }: { title: string; text: string }) {

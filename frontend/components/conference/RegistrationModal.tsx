@@ -397,7 +397,7 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
                     {registration && <p className="text-xl font-bold tracking-wide">{registration.ticket_code}</p>}
                   </div>
                   <p className="mb-4 mt-5 text-[#4d5460]">Add your photo to your <strong className="text-[#0c0d10]">I will be attending</strong> card and invite others. You can also do this later from your dashboard.</p>
-                  <AttendingCardStudio compact event={event} name={user?.name ?? name} church={user?.church ?? church} hasSavedPhoto={user?.has_photo ?? false} onPhotoSaved={() => setUser((current) => current ? { ...current, has_photo: true } : current)} />
+                  <AttendingCardStudio compact event={event} name={user?.name ?? name} hasSavedPhoto={user?.has_photo ?? false} onPhotoSaved={() => setUser((current) => current ? { ...current, has_photo: true } : current)} />
                 </div>
               )}
 

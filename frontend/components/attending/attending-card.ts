@@ -4,7 +4,6 @@
  */
 export type CardDetails = {
   name: string;
-  church: string;
   eventTitle: string;
   dateLabel: string;
   location: string | null;
@@ -127,11 +126,6 @@ export async function renderAttendingCard(details: CardDetails): Promise<Blob> {
   context.fillStyle = COLORS.ink;
   context.font = font(700, 48);
   wrap(context, details.name || 'Your name', 96, afterTitle + 92, WIDTH - 192, 56, 1);
-  if (details.church) {
-    context.fillStyle = '#4d5460';
-    context.font = font(500, 32);
-    wrap(context, details.church, 96, afterTitle + 142, WIDTH - 192, 40, 1);
-  }
 
   context.fillStyle = '#6b7280';
   context.font = font(500, 26);

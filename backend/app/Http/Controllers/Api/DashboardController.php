@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FeedbackRequest;
 use App\Http\Requests\TestimonialRequest;
+use App\Models\Broadcast;
 use App\Models\Event;
 use App\Services\DashboardService;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +19,10 @@ class DashboardController extends Controller
     {
         $event = $request->filled('event') ? Event::where('slug', $request->string('event')->toString())->first() : null;
 
-        return response()->json(['testimonials' => $this->dashboardService->testimonials($event)]);
+        return response()->json([
+            'testimonials' => $this->dashboardService->testimonials($event),
+            'mine' => $this->dashboardService->testimonialsBy($request->user(), $event),
+        ]);
     }
 
     public function submitTestimonial(TestimonialRequest $request): JsonResponse
@@ -36,6 +40,6 @@ class DashboardController extends Controller
 
     public function broadcasts(): JsonResponse
     {
-        return response()->json(['broadcasts' => \App\Models\Broadcast::query()->where('status', 'sent')->orWhere('status', 'scheduled')->latest()->limit(20)->get()]);
+        return response()->json(['broadcasts' => Broadcast::query()->where('status', 'sent')->orWhere('status', 'scheduled')->latest()->limit(20)->get()]);
     }
 }

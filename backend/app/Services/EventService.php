@@ -113,6 +113,9 @@ class EventService
             'offers_accommodation' => $event->offers_accommodation,
             'programme' => $event->programme ?? [],
             'stream_url' => $event->stream_url,
+            'stream_title' => $event->stream_title,
+            'stream_live' => $event->stream_live,
+            'hotels' => $event->hotels ?? [],
             'publicity' => [
                 'caption' => $event->publicity['caption'] ?? "I'm attending {$event->title}".($event->date_label !== 'Date TBA' ? " · {$event->date_label}" : '').'. Join me! #MIV',
                 'assets' => $event->publicity['assets'] ?? array_values(array_filter([

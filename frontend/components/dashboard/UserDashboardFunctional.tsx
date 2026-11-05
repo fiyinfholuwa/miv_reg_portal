@@ -7,7 +7,8 @@ import { AccountUser, EventRegistration, MivEvent, PRIMARY_EVENT_SLUG, apiReques
 import EventWorkspace, { EventTab, tabFromSlug } from './EventWorkspace';
 import { OrderHistory, Profile } from './AccountPanels';
 import { AccountMenu, EventSwitcher, Icon } from './DashboardChrome';
-import { Countdown, Qr, api } from './ui';
+import { Countdown, api } from './ui';
+import Code128Barcode from '../shop/Code128Barcode';
 
 type Route =
   | { kind: 'home' }
@@ -243,9 +244,9 @@ function EventCard({ registration, go }: { registration: EventRegistration; go: 
         <span className="text-xs font-semibold text-ink/50 sm:hidden">{event.date_label}</span>
         <h3 className="line-clamp-2 text-[15px] font-bold leading-snug sm:text-lg">{event.title}</h3>
         <p className="mt-0.5 truncate text-xs text-ink/55 sm:text-sm">{[event.location, registration.attendance_mode].filter(Boolean).join(' · ') || 'Details coming soon'}</p>
-        <div className="mt-3 flex items-center gap-3 rounded-xl bg-[#f6f2e9] p-2 sm:mt-4 sm:p-3">
-          <div className="hidden w-14 shrink-0 sm:block"><Qr small seed={registration.ticket_code} /></div>
-          <div className="min-w-0"><span className="block text-[10px] font-bold uppercase tracking-[.12em] text-ink/45">Ticket</span><strong className="block truncate font-display text-lg tracking-wide text-[#0b2c4a] sm:text-2xl">{registration.ticket_code}</strong></div>
+        <div className="mt-3 rounded-xl bg-[#f6f2e9] p-2 sm:mt-4 sm:p-3">
+          <div className="hidden overflow-hidden rounded-md sm:block"><Code128Barcode value={registration.ticket_code} height={44} /></div>
+          <span className="block text-[10px] font-bold uppercase tracking-[.12em] text-ink/45 sm:mt-2">Ticket</span><strong className="block truncate font-mono text-sm font-bold tracking-[.1em] text-[#0b2c4a] sm:text-base">{registration.ticket_code}</strong>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
           <button type="button" onClick={() => go(`/dashboard/events/${event.slug}`)} className="rounded-full bg-[#1469a9] px-4 py-2 text-xs font-bold text-white">Manage</button>
