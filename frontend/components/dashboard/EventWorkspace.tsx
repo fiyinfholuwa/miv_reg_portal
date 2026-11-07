@@ -59,7 +59,7 @@ export default function EventWorkspace({ registration, profile, tab, welcome, go
   }, [welcome, event.short_name]);
 
   return (
-    <div>
+    <div className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
       <header className="relative overflow-hidden rounded-[1.5rem] bg-[#03284a] text-white">
         {event.image && <img src={event.image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />}
         <div className="absolute inset-0 bg-gradient-to-r from-[#001428] via-[#001428]/80 to-transparent" />
@@ -96,8 +96,8 @@ function daysLabel(registration: EventRegistration) {
 
 /**
  * Event section navigation. Desktop shows every section in one row; phones
- * show the three main ones plus a labelled "More" button that opens a sheet
- * listing every section with a short description.
+ * keep the event navigation at the bottom and use "More" for the remaining
+ * sections.
  */
 function SectionNav({ event, tab, go }: { event: MivEvent; tab: EventTab; go: (href: string) => void }) {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -118,7 +118,7 @@ function SectionNav({ event, tab, go }: { event: MivEvent; tab: EventTab; go: (h
 
   return (
     <>
-      <nav className="sticky top-0 z-20 -mx-4 mb-5 bg-[#f6f2e9]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 2xl:-mx-10 2xl:px-10" aria-label={`${event.short_name} sections`}>
+      <nav className="fixed inset-x-0 bottom-0 z-40 mb-0 border-t border-ink/10 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 backdrop-blur lg:sticky lg:inset-x-auto lg:bottom-auto lg:z-20 lg:-mx-8 lg:mb-5 lg:border-t-0 lg:bg-[#f6f2e9]/95 lg:px-8 lg:py-3 lg:backdrop-blur 2xl:-mx-10 2xl:px-10" aria-label={`${event.short_name} sections`}>
         {/* Phones and tablets */}
         <div className="flex items-center gap-1.5 lg:hidden">
           {primary.map((item) => <button key={item.tab} type="button" onClick={() => open(item.tab)} aria-current={tab === item.tab ? 'page' : undefined} className={pill(tab === item.tab)}><Icon name={item.icon} size={16} className="hidden min-[400px]:block" />{item.label}</button>)}

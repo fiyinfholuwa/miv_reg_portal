@@ -160,6 +160,17 @@ export default function UserDashboardFunctional() {
           <AccountMenu name={profile.name} initials={initials} photoUrl={photoUrl} onProfile={() => go('/dashboard/profile')} onLogout={() => void logout()} />
         </header>
 
+        {/* Mobile dashboard menu: event-specific navigation uses the bottom bar. */}
+        <nav className="grid shrink-0 grid-cols-5 border-b border-ink/10 bg-white px-1 pb-1.5 pt-1 lg:hidden" aria-label="Dashboard sections">
+          {tabs.map((tab) => {
+            const className = `flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[11px] font-bold transition ${tab.active ? 'text-[#0b4779]' : 'text-ink/50'}`;
+            const inner = <><span className={`grid h-7 w-12 place-items-center rounded-full transition ${tab.active ? 'bg-[#e7f1fa]' : ''}`}><Icon name={tab.icon} size={20} /></span>{tab.label}</>;
+            return tab.external
+              ? <a key={tab.key} href={tab.href} className={className}>{inner}</a>
+              : <button key={tab.key} type="button" onClick={() => go(tab.href)} aria-current={tab.active ? 'page' : undefined} className={className}>{inner}</button>;
+          })}
+        </nav>
+
         {/* Only this area scrolls. */}
         <div ref={content} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <section className="w-full px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8 2xl:px-10">
@@ -172,16 +183,6 @@ export default function UserDashboardFunctional() {
           </section>
         </div>
 
-        {/* Phone tab bar: fixed at the bottom. */}
-        <nav className="grid shrink-0 grid-cols-5 border-t border-ink/10 bg-white px-1 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 lg:hidden" aria-label="Dashboard sections">
-          {tabs.map((tab) => {
-            const className = `flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[11px] font-bold transition ${tab.active ? 'text-[#0b4779]' : 'text-ink/50'}`;
-            const inner = <><span className={`grid h-7 w-12 place-items-center rounded-full transition ${tab.active ? 'bg-[#e7f1fa]' : ''}`}><Icon name={tab.icon} size={20} /></span>{tab.label}</>;
-            return tab.external
-              ? <a key={tab.key} href={tab.href} className={className}>{inner}</a>
-              : <button key={tab.key} type="button" onClick={() => go(tab.href)} aria-current={tab.active ? 'page' : undefined} className={className}>{inner}</button>;
-          })}
-        </nav>
       </div>
     </main>
   );

@@ -12,8 +12,8 @@ export default function HubHero({ registerSlug, next, content }: { registerSlug:
   const shortDate = next?.starts_at ? new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'Africa/Lagos' }).format(new Date(next.starts_at)) : null;
 
   return (
-    <div id="top" className="p-2.5 sm:p-4">
-      <section className="relative h-[calc(100svh-20px)] min-h-[620px] overflow-hidden rounded-[26px] bg-[#001428] text-[#faf6ec] sm:h-[680px] sm:min-h-0 lg:rounded-[28px]">
+    <div id="top" className="w-full">
+      <section className="relative h-[100vh] w-full overflow-hidden bg-[#001428] text-[#faf6ec]">
         <picture>
           <source media="(min-width: 640px)" srcSet={content.image} />
           <img src={content.image_mobile || content.image} alt="" className="absolute inset-0 h-full w-full object-cover" />

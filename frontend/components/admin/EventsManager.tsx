@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import type { MivEvent } from '../../lib/events';
+import { eventPageUrl, type MivEvent } from '../../lib/events';
 import { errorMessage, toast } from '../../lib/toast';
 import { api } from './adminApi';
 import { Field, ImageInput, card, input } from './adminUi';
@@ -140,6 +140,16 @@ export default function EventsManager({ onManageContent }: { onManageContent: ()
     try { await api(`/admin/events/${event.slug}`, { method: 'DELETE' }); toast.success(`${event.short_name} deleted.`); await load(); } catch (error) { toast.error(errorMessage(error, 'Could not delete the event.')); }
   };
 
+  const copyMagicLink = async (event: AdminEvent) => {
+    const link = `${eventPageUrl(event.slug)}#register`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success(`Registration link for ${event.short_name} copied.`);
+    } catch {
+      toast.error('Could not copy the registration link.');
+    }
+  };
+
   if (editing) return <EventForm key={editing === 'new' ? 'new' : editing.slug} initial={editing === 'new' ? emptyDraft : toDraft(editing)} editingSlug={editing === 'new' ? null : editing.slug} onCancel={() => setEditing(null)} onDone={async () => { setEditing(null); await load(); }} />;
   if (loading) return <div className="h-64 animate-pulse rounded-[1.5rem] bg-white" />;
 
@@ -153,10 +163,10 @@ export default function EventsManager({ onManageContent }: { onManageContent: ()
         actions={<><button type="button" onClick={onManageContent} className={secondaryButton}>Programme, live & hotels →</button><button type="button" onClick={() => setEditing('new')} className={primaryButton}>+ New event</button></>}
       />
       <div className="overflow-hidden rounded-[1.25rem] border border-ink/10 bg-white">
-        <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(0,1.2fr)_90px_minmax(0,1.4fr)_220px] gap-4 border-b border-ink/5 px-4 py-3 text-[11px] font-bold uppercase tracking-[.1em] text-ink/40 lg:grid"><span>Event</span><span>Date</span><span>People</span><span>Status</span><span className="text-right">Actions</span></div>
+        <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(0,1.2fr)_90px_minmax(0,1.4fr)_300px] gap-4 border-b border-ink/5 px-4 py-3 text-[11px] font-bold uppercase tracking-[.1em] text-ink/40 lg:grid"><span>Event</span><span>Date</span><span>People</span><span>Status</span><span className="text-right">Actions</span></div>
         {shown.length === 0 && <p className="p-6 text-sm text-ink/55">No events match.</p>}
         {shown.map((event) => (
-          <div key={event.slug} className="grid gap-3 border-b border-ink/5 px-4 py-3 last:border-0 lg:grid-cols-[minmax(0,2.4fr)_minmax(0,1.2fr)_90px_minmax(0,1.4fr)_220px] lg:items-center lg:gap-4">
+          <div key={event.slug} className="grid gap-3 border-b border-ink/5 px-4 py-3 last:border-0 lg:grid-cols-[minmax(0,2.4fr)_minmax(0,1.2fr)_90px_minmax(0,1.4fr)_300px] lg:items-center lg:gap-4">
             <div className="flex min-w-0 items-center gap-3"><span className="h-11 w-14 shrink-0 overflow-hidden rounded-lg bg-[#03284a]">{event.image && <img src={event.image} alt="" className="h-full w-full object-cover" />}</span><span className="min-w-0"><strong className="block truncate text-sm">{event.short_name}</strong><span className="block truncate text-xs text-ink/50">{event.title}</span></span></div>
             <span className="text-sm text-ink/70">{event.date_label}</span>
             <span className="text-sm font-bold">{event.registrations_count}</span>
@@ -164,8 +174,9 @@ export default function EventsManager({ onManageContent }: { onManageContent: ()
               <button type="button" onClick={() => void quickUpdate(event, { registration_open: !event.registration_open })} className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${event.registration_open ? 'bg-[#dff2e5] text-[#2f7d4f]' : 'bg-[#f1f2f4] text-ink/55'}`} title="Click to toggle">{event.registration_open ? 'Registration open' : 'Closed'}</button>
               <button type="button" onClick={() => void quickUpdate(event, { is_featured: !event.is_featured })} className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${event.is_featured ? 'bg-[#e7f1fa] text-[#0b4779]' : 'bg-[#f1f2f4] text-ink/55'}`} title="Click to toggle">{event.is_featured ? '★ Featured' : 'Not featured'}</button>
             </div>
-            <div className="flex gap-2 lg:justify-end">
+            <div className="flex flex-wrap gap-2 lg:justify-end">
               <a href={`/events/${event.slug}`} target="_blank" rel="noreferrer" className="rounded-full border border-ink/15 px-3 py-1.5 text-xs font-bold">View</a>
+              <button type="button" onClick={() => void copyMagicLink(event)} className="rounded-full border border-[#1469a9]/30 bg-[#e7f1fa] px-3 py-1.5 text-xs font-bold text-[#0b4779]">Copy link</button>
               <button type="button" onClick={() => setEditing(event)} className="rounded-full bg-[#03284a] px-3 py-1.5 text-xs font-bold text-white">Edit</button>
               <button type="button" onClick={() => void remove(event)} className="rounded-full bg-[#fff0ee] px-3 py-1.5 text-xs font-bold text-coral">Delete</button>
             </div>
