@@ -88,12 +88,12 @@ class EventContentApiTest extends TestCase
 
     public function test_admin_uploads_an_image_to_public_storage(): void
     {
-        Storage::fake('public');
+        Storage::fake('uploads');
 
         $response = $this->withToken($this->adminToken())->post('/api/admin/uploads', ['image' => UploadedFile::fake()->image('flyer.jpg', 800, 800)], ['Accept' => 'application/json'])
             ->assertCreated();
 
-        Storage::disk('public')->assertExists($response->json('path'));
+        Storage::disk('uploads')->assertExists($response->json('path'));
         $this->assertStringContainsString('/uploads/', $response->json('url'));
 
         $this->withToken($this->adminToken())->post('/api/admin/uploads', ['image' => UploadedFile::fake()->create('notes.pdf', 10, 'application/pdf')], ['Accept' => 'application/json'])

@@ -15,6 +15,9 @@ use Illuminate\Validation\ValidationException;
  */
 class EventContentService
 {
+    private const UPLOAD_DISK = 'uploads';
+    private const UPLOAD_DIRECTORY = 'uploads';
+
     public function __construct(private readonly EventService $eventService) {}
 
     /**
@@ -155,14 +158,38 @@ class EventContentService
     }
 
     /**
-     * Stores an admin image (flyer, hotel photo) on the public disk.
+     * Stores an admin image (product photo, flyer, hotel photo) in the
+     * configured public upload directory.
      *
      * @return array{url: string, path: string}
      */
     public function upload(UploadedFile $image): array
     {
-        $path = $image->storeAs('uploads/'.now()->format('Y/m'), Str::uuid().'.'.$image->extension(), 'public');
+        $directory = self::UPLOAD_DIRECTORY.'/'.now()->format('Y/m');
+        $disk = Storage::disk(self::UPLOAD_DISK);
 
-        return ['url' => Storage::disk('public')->url($path), 'path' => $path];
+        // Keep this explicit: deployments may start without the custom
+        // directory, and local disks do not all create nested folders in the
+        // same way when permissions are restricted.
+        $disk->makeDirectory($directory);
+
+        $path = $image->storeAs($directory, Str::uuid().'.'.$image->extension(), self::UPLOAD_DISK);
+
+        if (! is_string($path) || $path === '') {
+            throw new \RuntimeException('The uploaded image could not be stored.');
+        }
+
+        return ['url' => $this->uploadUrl($path), 'path' => $path];
+    }
+
+    private function uploadUrl(string $path): string
+    {
+        // The API request host belongs to the backend, even when the browser
+        // itself is running on a different frontend domain.
+        $baseUrl = app()->bound('request')
+            ? request()->getSchemeAndHttpHost()
+            : config('app.url', 'http://localhost');
+
+        return rtrim((string) $baseUrl, '/').'/'.ltrim($path, '/');
     }
 }

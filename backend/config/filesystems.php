@@ -47,6 +47,17 @@ return [
             'report' => false,
         ],
 
+        // Admin-managed images are written directly below the web root so
+        // they do not depend on a storage symlink being present on hosting.
+        'uploads' => [
+            'driver' => 'local',
+            'root' => public_path(),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/'),
+            'visibility' => 'public',
+            'throw' => true,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
