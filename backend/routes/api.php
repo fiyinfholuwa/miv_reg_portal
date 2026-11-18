@@ -70,7 +70,6 @@ Route::prefix('admin')->group(function (): void {
         Route::put('/settings/paystack', [AdminOperationsController::class, 'updatePaystackSettings']);
         Route::get('/settings/push', [AdminOperationsController::class, 'pushSettings']);
         Route::put('/settings/push', [AdminOperationsController::class, 'updatePushSettings']);
-        Route::post('/settings/push/regenerate', [AdminOperationsController::class, 'regeneratePushKeys']);
         Route::put('/account/password', [AdminOperationsController::class, 'updatePassword']);
         Route::post('/account/sign-out-others', [AdminOperationsController::class, 'signOutOthers']);
         Route::post('/admins', [AdminOperationsController::class, 'createAdmin']);
@@ -103,6 +102,7 @@ Route::get('/user', [RegistrationController::class, 'user'])->middleware('auth:s
 Route::get('/push/public-key', [PushSubscriptionController::class, 'publicKey']);
 Route::get('/events', [EventController::class, 'index']);
 Route::get('/events/{event}', [EventController::class, 'show']);
+Route::get('/cards/{event}/{code}', [AttendingCardController::class, 'card'])->where('code', '[a-f0-9]{24}');
 Route::get('/share/{event}/{code}', [AttendingCardController::class, 'show'])->where('code', '[a-f0-9]{24}');
 Route::get('/shop/products', [ShopController::class, 'products']);
 Route::get('/site-content', [SiteContentController::class, 'index']);

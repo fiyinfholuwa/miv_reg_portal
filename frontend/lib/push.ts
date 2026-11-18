@@ -19,20 +19,24 @@ export function registerServiceWorker() {
   return navigator.serviceWorker.register('/sw.js').catch(() => null);
 }
 
-async function publicKey(): Promise<string | null> {
-  try {
-    const response = await fetch(apiUrl('/push/public-key'), { headers: { Accept: 'application/json' } });
-    const data = await response.json();
-    return data.public_key ?? null;
-  } catch {
-    return null;
-  }
-}
+/**
+ * Built-in VAPID public key. Must match PushSettingsService::PUBLIC_KEY in the
+ * backend. Kept in code so subscribing needs no network call before the
+ * permission prompt (Safari only allows the prompt straight from a tap).
+ */
+export const VAPID_PUBLIC_KEY = 'BMBiwYmq1onmrpgjFt5_C1D3YQR_LO2dTEMBM_Ym7kmMUHt2wCU79w4L4MTpKJ8imugMWjQsQ01--DNP1hVZ0hU';
 
 function keyBytes(base64: string) {
   const padded = (base64 + '='.repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
   const raw = atob(padded);
   return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+}
+
+function sameKey(current: ArrayBuffer | null, expected: string) {
+  if (!current) return false;
+  const a = new Uint8Array(current);
+  const b = keyBytes(expected);
+  return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 async function currentSubscription() {
@@ -71,16 +75,20 @@ function contentEncoding() {
 /** Must be called from a click handler: asks permission and subscribes. */
 export async function enablePush(): Promise<PushStatus> {
   if (!pushSupported()) return isIos() && !isStandalone() ? 'ios-needs-install' : 'unsupported';
-  const key = await publicKey();
-  if (!key) return 'not-configured';
-
+  // Ask first, directly from the tap, before any await.
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') return permission === 'denied' ? 'denied' : 'off';
 
-  const registration = (await registerServiceWorker()) ?? (await navigator.serviceWorker.ready);
+  await registerServiceWorker();
+  const registration = await navigator.serviceWorker.ready;
   let subscription = await registration.pushManager.getSubscription();
+  // A subscription made with an older key can't receive pushes; replace it.
+  if (subscription && !sameKey(subscription.options.applicationServerKey, VAPID_PUBLIC_KEY)) {
+    await subscription.unsubscribe().catch(() => undefined);
+    subscription = null;
+  }
   if (!subscription) {
-    subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
+    subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID_PUBLIC_KEY) });
   }
   await send('POST', { ...subscription.toJSON(), content_encoding: contentEncoding() });
   return 'on';

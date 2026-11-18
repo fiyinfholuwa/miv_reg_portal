@@ -33,6 +33,12 @@ class AttendingCardApiTest extends TestCase
             ->assertOk()
             ->assertSee('<meta property="og:image" content="'.e($response->json('image_url')).'">', false)
             ->assertSee('/events/'.$event->slug, false);
+
+        $this->getJson('/api/cards/'.$event->slug.'/'.$response->json('code'))
+            ->assertOk()
+            ->assertJsonPath('image_url', $response->json('image_url'))
+            ->assertJsonPath('event.slug', $event->slug);
+        $this->getJson('/api/cards/'.$event->slug.'/'.str_repeat('b', 24))->assertNotFound();
     }
 
     public function test_card_requires_registration_and_a_png(): void

@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\PushSubscription;
 use App\Models\User;
 use App\Services\Push\PushSender;
+use App\Services\Push\PushSettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
@@ -68,36 +69,26 @@ class PushNotificationApiTest extends TestCase
         $this->assertDatabaseCount('push_subscriptions', 0);
     }
 
-    public function test_keys_are_created_in_the_database_on_first_use_and_exposed_for_subscribing(): void
+    public function test_built_in_public_key_is_exposed_for_subscribing(): void
     {
-        $first = $this->getJson('/api/push/public-key')->assertOk()->json('public_key');
-
-        $this->assertNotEmpty($first);
-        $this->assertDatabaseHas('app_settings', ['key' => 'webpush_private_key']);
-        $this->getJson('/api/push/public-key')->assertJsonPath('public_key', $first);
+        $this->getJson('/api/push/public-key')->assertOk()->assertJsonPath('public_key', PushSettingsService::PUBLIC_KEY);
     }
 
-    public function test_full_access_admin_can_view_change_and_regenerate_push_keys(): void
+    public function test_full_access_admin_can_change_the_push_contact(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);
         $token = $admin->createToken('admin', ['admin'])->plainTextToken;
 
-        $original = $this->withToken($token)->getJson('/api/admin/settings/push')
+        $this->withToken($token)->getJson('/api/admin/settings/push')
             ->assertOk()
-            ->assertJsonPath('settings.private_key_set', true)
-            ->assertJsonMissingPath('settings.private_key')
-            ->json('settings.public_key');
+            ->assertJsonPath('settings.public_key', PushSettingsService::PUBLIC_KEY)
+            ->assertJsonMissingPath('settings.private_key');
 
         $this->withToken($token)->putJson('/api/admin/settings/push', ['subject' => 'mailto:team@example.com'])
             ->assertOk()
-            ->assertJsonPath('settings.subject', 'mailto:team@example.com')
-            ->assertJsonPath('settings.public_key', $original);
+            ->assertJsonPath('settings.subject', 'mailto:team@example.com');
 
         $this->withToken($token)->putJson('/api/admin/settings/push', ['subject' => 'not a contact'])->assertUnprocessable();
-
-        $regenerated = $this->withToken($token)->postJson('/api/admin/settings/push/regenerate')->assertOk()->json('settings.public_key');
-        $this->assertNotSame($original, $regenerated);
-        $this->getJson('/api/push/public-key')->assertJsonPath('public_key', $regenerated);
     }
 
     public function test_limited_admin_cannot_manage_push_keys(): void
@@ -106,7 +97,7 @@ class PushNotificationApiTest extends TestCase
         $token = $admin->createToken('admin', ['admin'])->plainTextToken;
 
         $this->withToken($token)->getJson('/api/admin/settings/push')->assertForbidden();
-        $this->withToken($token)->postJson('/api/admin/settings/push/regenerate')->assertForbidden();
+        $this->withToken($token)->putJson('/api/admin/settings/push', ['subject' => 'mailto:x@example.com'])->assertForbidden();
     }
 
     public function test_a_new_notification_is_pushed_to_the_users_browsers_and_gone_ones_are_removed(): void

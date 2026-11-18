@@ -146,7 +146,7 @@ export async function uploadPhoto(file: File) {
  * Publish a rendered card so links can show it. Returns a share link whose
  * preview (WhatsApp, Facebook, X, LinkedIn…) is the card image.
  */
-export async function publishCard(slug: string, card: Blob): Promise<{ share_url: string; image_url: string }> {
+export async function publishCard(slug: string, card: Blob): Promise<{ code: string; share_url: string; image_url: string }> {
   const body = new FormData();
   body.append('card', new File([card], 'card.png', { type: 'image/png' }));
   let response: Response;
@@ -169,6 +169,11 @@ export async function fetchPhotoUrl(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/** Public link for a published card, on this website's own domain. */
+export function cardShareUrl(slug: string, code: string) {
+  return `${window.location.origin}/events/${encodeURIComponent(slug)}/attending/${code}`;
 }
 
 export function eventPageUrl(slug: string) {

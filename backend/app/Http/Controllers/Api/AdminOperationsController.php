@@ -210,13 +210,6 @@ class AdminOperationsController extends Controller
         return response()->json($pushSettings->save($request->validated()));
     }
 
-    public function regeneratePushKeys(Request $request, PushSettingsService $pushSettings): JsonResponse
-    {
-        $this->adminService->ensureSuperAdmin($request->user());
-
-        return response()->json($pushSettings->regenerate());
-    }
-
     public function updatePassword(AdminPasswordRequest $request): JsonResponse
     {
         $this->adminService->ensureAdmin($request->user());

@@ -6,7 +6,6 @@ use App\Models\Event;
 use App\Models\ShopProduct;
 use App\Models\User;
 use App\Services\EventCatalog;
-use App\Services\Push\PushSettingsService;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -56,8 +55,5 @@ class DatabaseSeeder extends Seeder
         foreach ($products as $product) {
             ShopProduct::updateOrCreate(['name' => $product['name']], [...$product, 'active' => true]);
         }
-
-        // Web Push keys live in the database; create them once (admins can change them in Settings).
-        app(PushSettingsService::class)->ensureKeys();
     }
 }

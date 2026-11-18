@@ -19,8 +19,6 @@ class PushSettingsRequest extends FormRequest
     {
         return [
             'subject' => ['nullable', 'string', 'max:190', 'regex:/^(mailto:\S+@\S+|https:\/\/\S+)$/'],
-            'public_key' => ['nullable', 'required_with:private_key', 'string', 'max:200'],
-            'private_key' => ['nullable', 'required_with:public_key', 'string', 'max:200'],
         ];
     }
 

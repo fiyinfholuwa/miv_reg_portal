@@ -10,7 +10,7 @@ import { PermissionPicker, hasPermission, permissionSummary, type AdminPermissio
 type Profile = { id: number; name: string; email: string; phone: string | null; permissions: AdminPermissions; sessions: number; created_at: string | null };
 type AdminUser = { id: number; name: string; email: string; permissions: AdminPermissions; created_at: string | null };
 type PaystackSettings = { public_key: string; secret_key: string; secret_key_set: boolean };
-type PushSettings = { public_key: string; subject: string; private_key_set: boolean; private_key: string; new_public_key: string };
+type PushSettings = { public_key: string; subject: string };
 type SettingsTab = 'profile' | 'password' | 'paystack' | 'push' | 'sessions' | 'team';
 
 const PASSWORD_HINT = 'At least 10 characters with letters and numbers.';
@@ -70,7 +70,7 @@ export function SettingsView({ onProfileChange }: { onProfileChange?: (profile: 
   const loadPush = useCallback(async () => {
     try {
       const data = await api('/admin/settings/push');
-      setPush({ ...data.settings, private_key: '', new_public_key: '' });
+      setPush(data.settings);
     } catch (error) { toast.error(errorMessage(error, 'Could not load push settings.')); }
   }, []);
   useEffect(() => { if (isSuper) void loadPush(); }, [isSuper, loadPush]);
@@ -100,24 +100,12 @@ export function SettingsView({ onProfileChange }: { onProfileChange?: (profile: 
 
   const savePush = (event: FormEvent<HTMLFormElement>) => { event.preventDefault();
     if (!push) return;
-    if (Boolean(push.new_public_key) !== Boolean(push.private_key)) { toast.warning('Enter both the public and private key, or leave both blank.'); return; }
     void run('push', async () => {
       try {
-        const data = await api('/admin/settings/push', { method: 'PUT', body: JSON.stringify({ subject: push.subject || null, public_key: push.new_public_key || null, private_key: push.private_key || null }) });
-        setPush({ ...data.settings, private_key: '', new_public_key: '' });
+        const data = await api('/admin/settings/push', { method: 'PUT', body: JSON.stringify({ subject: push.subject || null }) });
+        setPush(data.settings);
         toast.success(data.message);
       } catch (error) { toast.error(errorMessage(error, 'Could not save push settings.')); }
-    });
-  };
-
-  const regeneratePush = () => {
-    if (!window.confirm('Create new push keys? Everyone who turned on push notifications will need to turn them on again.')) return;
-    void run('push-regenerate', async () => {
-      try {
-        const data = await api('/admin/settings/push/regenerate', { method: 'POST' });
-        setPush({ ...data.settings, private_key: '', new_public_key: '' });
-        toast.success(data.message);
-      } catch (error) { toast.error(errorMessage(error, 'Could not create new keys.')); }
     });
   };
 
@@ -184,23 +172,12 @@ export function SettingsView({ onProfileChange }: { onProfileChange?: (profile: 
         ) : <div className="h-24 animate-pulse rounded-xl bg-[#fafaf8]" />}
       </Section>}
 
-      {activeTab === 'push' && isSuper && <Section title="Push notifications" description="Keys that let the site send notifications to phones and computers (standard Web Push, no Firebase). They were created automatically and are stored encrypted in the database.">
+      {activeTab === 'push' && isSuper && <Section title="Push notifications" description="Standard Web Push, no Firebase. The keys are built into the app, so there is nothing to set up.">
         {push ? (
-          <form onSubmit={savePush} className="grid gap-4 sm:grid-cols-2">
-            <Field title="Contact (sent to browser push services)" className="sm:col-span-2"><input value={push.subject} onChange={(event) => setPush({ ...push, subject: event.target.value })} className={input} placeholder="mailto:you@example.com" autoComplete="off" /></Field>
-            <Field title="Current public key" className="sm:col-span-2"><input readOnly value={push.public_key} className={`${input} font-mono text-xs`} onFocus={(event) => event.target.select()} /></Field>
-            <details className="sm:col-span-2 rounded-xl bg-[#fafaf8] p-4 text-sm">
-              <summary className="cursor-pointer font-bold">Use your own keys (optional)</summary>
-              <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                <Field title="Public key"><input value={push.new_public_key} onChange={(event) => setPush({ ...push, new_public_key: event.target.value })} className={`${input} font-mono text-xs`} autoComplete="off" /></Field>
-                <Field title="Private key"><PasswordInput value={push.private_key} onChange={(event) => setPush({ ...push, private_key: event.target.value })} className={`${input} font-mono text-xs`} autoComplete="new-password" /></Field>
-              </div>
-              <p className="mb-0 mt-2 text-xs text-ink/50">Leave both blank to keep the current keys. Changing keys means everyone must turn push on again.</p>
-            </details>
-            <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3">
-              <button type="button" onClick={regeneratePush} disabled={busy === 'push-regenerate'} className={secondaryButton}>{busy === 'push-regenerate' ? 'Creating…' : 'Create new keys'}</button>
-              <button type="submit" disabled={busy === 'push'} className={primaryButton}>{busy === 'push' ? 'Saving…' : 'Save push settings'}</button>
-            </div>
+          <form onSubmit={savePush} className="grid gap-4">
+            <Field title="Contact (sent to browser push services)"><input value={push.subject} onChange={(event) => setPush({ ...push, subject: event.target.value })} className={input} placeholder="mailto:you@example.com" autoComplete="off" /></Field>
+            <Field title="Public key (built in)"><input readOnly value={push.public_key} className={`${input} font-mono text-xs`} onFocus={(event) => event.target.select()} /></Field>
+            <div><button type="submit" disabled={busy === 'push'} className={primaryButton}>{busy === 'push' ? 'Saving…' : 'Save'}</button></div>
           </form>
         ) : <div className="h-24 animate-pulse rounded-xl bg-[#fafaf8]" />}
       </Section>}

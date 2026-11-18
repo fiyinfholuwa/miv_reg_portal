@@ -22,7 +22,7 @@ class AttendingCardService
 
     public function __construct(private readonly UploadUrlService $uploadUrlService) {}
 
-    /** @return array{share_url: string, image_url: string} */
+    /** @return array{code: string, share_url: string, image_url: string} */
     public function store(User $user, Event $event, UploadedFile $card): array
     {
         $registered = EventRegistration::where('user_id', $user->id)->where('event_id', $event->id)->exists();
@@ -36,6 +36,7 @@ class AttendingCardService
         $card->storeAs(self::DIRECTORY, $code.'.png', self::DISK);
 
         return [
+            'code' => $code,
             'share_url' => $this->uploadUrlService->url('api/share/'.$event->slug.'/'.$code),
             'image_url' => $this->imageUrl($code),
         ];
