@@ -138,6 +138,24 @@ export async function uploadPhoto(file: File) {
   if (!response.ok) throw new ApiError(data.errors?.photo?.[0] ?? data.message ?? 'We could not save your photo.', response.status);
 }
 
+/**
+ * Publish a rendered card so links can show it. Returns a share link whose
+ * preview (WhatsApp, Facebook, X, LinkedIn…) is the card image.
+ */
+export async function publishCard(slug: string, card: Blob): Promise<{ share_url: string; image_url: string }> {
+  const body = new FormData();
+  body.append('card', new File([card], 'card.png', { type: 'image/png' }));
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(`/auth/events/${encodeURIComponent(slug)}/card`), { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${readSession()}` }, body });
+  } catch {
+    throw new ApiError('We could not reach the server to publish your card.', 0);
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new ApiError(data.errors?.card?.[0] ?? data.message ?? 'We could not publish your card.', response.status);
+  return data;
+}
+
 /** The saved photo as a same-origin object URL (safe to draw on a canvas), or null. */
 export async function fetchPhotoUrl(): Promise<string | null> {
   try {

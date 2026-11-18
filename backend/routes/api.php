@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AdminOperationsController;
+use App\Http\Controllers\Api\AttendingCardController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\ProfilePhotoController;
@@ -31,6 +32,7 @@ Route::prefix('auth')->group(function (): void {
         Route::post('/photo', [ProfilePhotoController::class, 'store']);
         Route::delete('/photo', [ProfilePhotoController::class, 'destroy']);
         Route::post('/events/{event}/register', [EventController::class, 'register']);
+        Route::post('/events/{event}/card', [AttendingCardController::class, 'store']);
         Route::post('/events/{event}/team', [EventController::class, 'joinTeam']);
         Route::delete('/events/{event}/team', [EventController::class, 'leaveTeam']);
     });
@@ -90,6 +92,7 @@ Route::prefix('admin')->group(function (): void {
 Route::get('/user', [RegistrationController::class, 'user'])->middleware('auth:sanctum');
 Route::get('/events', [EventController::class, 'index']);
 Route::get('/events/{event}', [EventController::class, 'show']);
+Route::get('/share/{event}/{code}', [AttendingCardController::class, 'show'])->where('code', '[a-f0-9]{24}');
 Route::get('/shop/products', [ShopController::class, 'products']);
 Route::get('/site-content', [SiteContentController::class, 'index']);
 Route::post('/partner-inquiries', [ShopController::class, 'partnerInquiry']);
