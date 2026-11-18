@@ -5,6 +5,7 @@ export async function api(path: string, options: RequestInit = {}) {
   const token = window.localStorage.getItem('jan-conf-session');
   const response = await fetch(API_URL + path, {
     ...options,
+    ...(options.method === undefined || options.method.toUpperCase() === 'GET' ? { cache: 'no-store' as RequestCache } : {}),
     headers: { Accept: 'application/json', ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: 'Bearer ' + token } : {}), ...options.headers },
   });
   const data = await response.json().catch(() => ({}));

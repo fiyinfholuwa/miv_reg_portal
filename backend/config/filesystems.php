@@ -52,7 +52,10 @@ return [
         'uploads' => [
             'driver' => 'local',
             'root' => public_path(),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/'),
+            // Used as a deployment hint when supplied; UploadUrlService also
+            // resolves forwarded production hosts dynamically.
+            'public_url' => env('UPLOAD_PUBLIC_URL'),
+            'url' => rtrim(env('UPLOAD_PUBLIC_URL', env('APP_URL', 'http://localhost')), '/'),
             'visibility' => 'public',
             'throw' => true,
             'report' => false,

@@ -44,7 +44,7 @@ export default function AttendingCardStudio({ event, name: initialName, hasSaved
   useEffect(() => {
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      void renderAttendingCard({ name, eventTitle: event.title, dateLabel: event.date_label, location: event.location, photoUrl })
+      void renderAttendingCard({ name, eventTitle: event.title, dateLabel: event.date_label, location: event.location, eventUrl: eventPageUrl(event.slug), photoUrl })
         .then((blob) => {
           if (cancelled) return;
           setCardBlob(blob);
@@ -53,7 +53,7 @@ export default function AttendingCardStudio({ event, name: initialName, hasSaved
         .catch((renderError) => !cancelled && toast.error(renderError instanceof Error ? renderError.message : 'Could not draw the card.'));
     }, 250);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [name, photoUrl, event.title, event.date_label, event.location]);
+  }, [name, photoUrl, event.slug, event.title, event.date_label, event.location]);
 
   const choosePhoto = async (changeEvent: ChangeEvent<HTMLInputElement>) => {
     const file = changeEvent.target.files?.[0];

@@ -186,7 +186,7 @@ export default function CartPage() {
               <span className="text-sm text-[#bcd6ec]">Total</span>
               <strong className="text-4xl font-semibold tabular-nums">{naira(total)}</strong>
             </div>
-            <p className="mt-4 text-sm leading-6 text-[#bcd6ec]">Payment is handled securely by Paystack. Collect your order at the conference store with your pickup barcode.</p>
+            <p className="mt-4 text-sm leading-6 text-[#bcd6ec]">Payment is handled securely by Paystack. Collect your order at the conference store with your pickup QR code.</p>
             <button type="button" disabled={!total || checkingOut} onClick={() => void checkout()} className="mt-6 w-full rounded-full bg-[#a82e26] px-5 py-4 text-[15px] font-bold text-white transition hover:bg-[#8c1f1c] disabled:cursor-not-allowed disabled:opacity-40">
               {checkingOut ? 'Opening payment…' : `Checkout · ${naira(total)}`}
             </button>

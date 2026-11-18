@@ -40,7 +40,7 @@ function ProductForm({ product, onClose, onSaved }: { product: Product | null; o
     <Modal title={product ? `Edit ${product.name}` : 'New product'} onClose={onClose} size="xl" footer={<><button type="button" onClick={onClose} className={secondaryButton}>Cancel</button><button type="submit" form="product-form" disabled={saving} className={primaryButton}>{saving ? 'Saving…' : product ? 'Save product' : 'Add product'}</button></>}>
       <form id="product-form" onSubmit={submit} className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
         <div className="grid content-start gap-3">
-          <Field title="Main photo"><ImageInput value={form.image} onChange={(url) => set('image', url)} /></Field>
+          <Field title="Main photo"><ImageInput value={form.image} onChange={(url) => set('image', url)} showUrl={false} /></Field>
           <label className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 text-sm font-semibold">Visible in shop<input type="checkbox" checked={form.active} onChange={(event) => set('active', event.target.checked)} className="h-4 w-4" /></label>
         </div>
         <div className="grid content-start gap-4">
@@ -179,7 +179,7 @@ export function AdminOrdersView() {
       </div>
 
       <form onSubmit={(event) => { event.preventDefault(); void collect(pickup); }} className={`${card} flex flex-col gap-3 sm:flex-row sm:items-center`}>
-        <div className="min-w-0 flex-1"><strong className="block text-sm">Store collection</strong><span className="text-xs text-ink/55">Scan the buyer’s pickup barcode (or type the code) to hand over their order.</span></div>
+        <div className="min-w-0 flex-1"><strong className="block text-sm">Store collection</strong><span className="text-xs text-ink/55">Scan the buyer’s pickup QR code (or type the code) to hand over their order.</span></div>
         <input ref={pickupInput} value={pickup} onChange={(event) => setPickup(event.target.value.toUpperCase())} className="h-12 rounded-xl border-2 border-[#03284a]/20 bg-white px-4 font-mono font-bold tracking-[.06em] outline-none focus:border-[#1469a9] sm:w-80" placeholder="JC27-ORD-…" aria-label="Pickup code" autoComplete="off" />
         <button type="submit" disabled={collecting || !pickup.trim()} className={`${primaryButton} h-12`}>{collecting ? 'Checking…' : 'Hand over'}</button>
       </form>

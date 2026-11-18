@@ -8,7 +8,7 @@ import EventWorkspace, { EventTab, tabFromSlug } from './EventWorkspace';
 import { OrderHistory, Profile } from './AccountPanels';
 import { AccountMenu, EventSwitcher, Icon } from './DashboardChrome';
 import { Countdown, api } from './ui';
-import Code128Barcode from '../shop/Code128Barcode';
+import QRCode from '../shop/QRCode';
 
 type Route =
   | { kind: 'home' }
@@ -274,7 +274,7 @@ function EventCard({ registration, go }: { registration: EventRegistration; go: 
         <h3 className="line-clamp-2 text-[15px] font-bold leading-snug sm:text-lg">{event.title}</h3>
         <p className="mt-0.5 truncate text-xs text-ink/55 sm:text-sm">{[event.location, registration.attendance_mode].filter(Boolean).join(' · ') || 'Details coming soon'}</p>
         <div className="mt-3 rounded-xl bg-[#f6f2e9] p-2 sm:mt-4 sm:p-3">
-          <div className="hidden overflow-hidden rounded-md sm:block"><Code128Barcode value={registration.ticket_code} height={44} /></div>
+          <div className="hidden overflow-hidden rounded-md sm:block"><QRCode value={registration.ticket_code} size={72} /></div>
           <span className="block text-[10px] font-bold uppercase tracking-[.12em] text-ink/45 sm:mt-2">Ticket</span><strong className="block truncate font-mono text-sm font-bold tracking-[.1em] text-[#0b2c4a] sm:text-base">{registration.ticket_code}</strong>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">

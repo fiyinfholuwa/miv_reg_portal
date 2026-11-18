@@ -25,7 +25,7 @@ import {
  * Open it from anywhere with:
  *   window.dispatchEvent(new CustomEvent('open-registration-modal', { detail: { event: 'imlc' } }))
  *   detail.mode = 'login' opens the email-only sign-in instead of the new-account form.
- * Links to "#register" open it too (no event preselected).
+ * Links to "#register" and "/events/:slug#register" open it too.
  */
 type Step = 'loading' | 'register' | 'login' | 'otp' | 'profile' | 'attendance' | 'already' | 'done';
 type OpenDetail = { event?: string; mode?: 'login' | 'register'; returnTo?: string; closeTo?: string };
@@ -130,22 +130,42 @@ export default function RegistrationModal({ defaultEvent }: { defaultEvent?: str
   }, [continueWithEvent]);
 
   useEffect(() => {
+    const eventSlugFromPath = (pathname: string) => {
+      const match = pathname.match(/^\/events\/([^/]+)\/?$/);
+      return match ? decodeURIComponent(match[1]) : undefined;
+    };
+
+    const openFromUrl = (url: URL) => {
+      if (url.origin !== window.location.origin || url.hash !== '#register') return;
+      window.history.pushState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+      void start({ event: eventSlugFromPath(url.pathname) || defaultEvent });
+    };
+
     const openFromLink = (clickEvent: MouseEvent) => {
       const target = clickEvent.target;
-      if (!(target instanceof Element) || !target.closest('a[href="#register"]')) return;
+      if (!(target instanceof Element)) return;
+      const link = target.closest<HTMLAnchorElement>('a[href]');
+      if (!link) return;
+      const url = new URL(link.href, window.location.href);
+      if (url.hash !== '#register' || url.origin !== window.location.origin) return;
       clickEvent.preventDefault();
-      void start({ event: defaultEvent });
+      openFromUrl(url);
     };
     const openFromEvent = (customEvent: Event) => {
       const detail = customEvent instanceof CustomEvent && customEvent.detail && typeof customEvent.detail === 'object' ? customEvent.detail as OpenDetail : {};
       void start(detail);
     };
+    const closeOnBack = () => {
+      if (window.location.hash !== '#register') setOpen(false);
+    };
     document.addEventListener('click', openFromLink);
     window.addEventListener('open-registration-modal', openFromEvent);
-    if (window.location.hash === '#register') void start({ event: defaultEvent });
+    window.addEventListener('popstate', closeOnBack);
+    if (window.location.hash === '#register') void start({ event: eventSlugFromPath(window.location.pathname) || defaultEvent });
     return () => {
       document.removeEventListener('click', openFromLink);
       window.removeEventListener('open-registration-modal', openFromEvent);
+      window.removeEventListener('popstate', closeOnBack);
     };
   }, [start, defaultEvent]);
 

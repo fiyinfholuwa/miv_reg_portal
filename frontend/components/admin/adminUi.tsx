@@ -21,8 +21,8 @@ export function SaveBar({ saving, onSave, note }: { saving: boolean; onSave: () 
   );
 }
 
-/** Image preview with upload and paste-a-link options. */
-export function ImageInput({ value, onChange, aspect = 'aspect-square' }: { value: string; onChange: (url: string) => void; aspect?: string }) {
+/** Image preview with upload and optional paste-a-link support. */
+export function ImageInput({ value, onChange, aspect = 'aspect-square', showUrl = true }: { value: string; onChange: (url: string) => void; aspect?: string; showUrl?: boolean }) {
   const file = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const upload = async (chosen?: File) => {
@@ -37,7 +37,7 @@ export function ImageInput({ value, onChange, aspect = 'aspect-square' }: { valu
         {value && <span className="absolute bottom-2 right-2 rounded-full bg-white/95 px-2.5 py-1 text-[11px] text-ink shadow">{uploading ? 'Uploading…' : 'Replace'}</span>}
       </button>
       <input ref={file} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { void upload(event.target.files?.[0]); event.target.value = ''; }} />
-      <input value={value} onChange={(event) => onChange(event.target.value)} className={`${input} text-xs`} placeholder="…or paste an image link" />
+      {showUrl && <input value={value} onChange={(event) => onChange(event.target.value)} className={`${input} text-xs`} placeholder="…or paste an image link" />}
     </div>
   );
 }

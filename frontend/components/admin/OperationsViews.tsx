@@ -21,7 +21,7 @@ type DeskStats = { date: string; registered: number; checked_in: number; checked
 const time = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit', timeZone: 'Africa/Lagos' }) : '';
 
 /**
- * Welcome desk and meal points. A barcode scanner types the ticket code and
+ * Welcome desk and meal points. A QR scanner types the ticket code and
  * presses Enter, so the code box stays focused and ready for the next scan.
  */
 export function CheckInView() {
@@ -120,7 +120,7 @@ export function CheckInView() {
               </div>
               {current.checked_in_at && <button type="button" onClick={() => void undo()} className="mt-3 text-xs font-bold text-coral">Undo check-in</button>}
             </div>
-          ) : <p className="rounded-2xl border-2 border-dashed border-ink/10 p-6 text-center text-sm text-ink/50">Scan a ticket barcode from the delegate’s pass (My pass on their dashboard).</p>}
+          ) : <p className="rounded-2xl border-2 border-dashed border-ink/10 p-6 text-center text-sm text-ink/50">Scan the ticket QR code from the delegate’s pass (My pass on their dashboard).</p>}
         </section>
 
         <section className={card}>
@@ -179,10 +179,10 @@ export function BroadcastsView() {
   };
 
   const columns: Column<Broadcast>[] = [
-    { key: 'actions', header: <span className="sr-only">Actions</span>, className: 'text-right', cell: (item) => <div onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => void remove(item)} className={dangerButton}>Delete</button></div> },
     { key: 'title', header: 'Title', cell: (item) => <div className="min-w-0 max-w-[460px]"><strong className="block truncate">{item.title}</strong><span className="block truncate text-xs text-ink/50">{item.body}</span></div> },
     { key: 'status', header: 'Status', cell: (item) => <StatusBadge status={item.status} /> },
     { key: 'when', header: 'Date', cell: (item) => <span className="whitespace-nowrap text-ink/60">{item.status === 'scheduled' && item.scheduled_at ? `For ${formatDate(item.scheduled_at, true)}` : formatDate(item.created_at, true)}</span> },
+    { key: 'actions', header: <span className="sr-only">Actions</span>, className: 'text-right', cell: (item) => <div onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => void remove(item)} className={dangerButton}>Delete</button></div> },
   ];
 
   return (

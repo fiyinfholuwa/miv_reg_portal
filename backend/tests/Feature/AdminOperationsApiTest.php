@@ -8,6 +8,7 @@ use App\Models\EventRegistration;
 use App\Models\ShopOrder;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\PaystackSettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -132,6 +133,22 @@ class AdminOperationsApiTest extends TestCase
         $this->assertFalse(User::find($created['id'])->is_admin);
     }
 
+    public function test_admin_can_save_paystack_keys_without_exposing_the_secret(): void
+    {
+        $this->withToken($this->token)->putJson('/api/admin/settings/paystack', [
+            'public_key' => 'pk_live_example',
+            'secret_key' => 'sk_live_example',
+        ])->assertOk()->assertJsonPath('settings.public_key', 'pk_live_example')->assertJsonPath('settings.secret_key_set', true);
+
+        $settings = $this->withToken($this->token)->getJson('/api/admin/settings/paystack')->assertOk()->json('settings');
+
+        $this->assertSame('pk_live_example', $settings['public_key']);
+        $this->assertTrue($settings['secret_key_set']);
+        $this->assertArrayNotHasKey('secret_key', $settings);
+        $this->assertSame('sk_live_example', app(PaystackSettingsService::class)->credentials()['secret_key']);
+        $this->assertDatabaseHas('app_settings', ['key' => 'paystack_secret_key']);
+    }
+
     public function test_operations_require_an_admin(): void
     {
         $token = User::factory()->create()->createToken('user')->plainTextToken;
@@ -141,6 +158,7 @@ class AdminOperationsApiTest extends TestCase
         $this->withToken($token)->getJson('/api/admin/check-in/lookup?code=X')->assertForbidden();
         $this->withToken($token)->deleteJson("/api/admin/teams/{$team->id}")->assertForbidden();
         $this->withToken($token)->getJson('/api/admin/account')->assertForbidden();
+        $this->withToken($token)->getJson('/api/admin/settings/paystack')->assertForbidden();
     }
 
     public function test_admin_sees_who_verified_their_email_and_can_resend_the_code(): void

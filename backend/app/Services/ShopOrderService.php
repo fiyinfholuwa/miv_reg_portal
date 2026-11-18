@@ -11,7 +11,10 @@ use Illuminate\Validation\ValidationException;
 
 class ShopOrderService
 {
-    public function __construct(private readonly ShopLineItems $lineItems) {}
+    public function __construct(
+        private readonly ShopLineItems $lineItems,
+        private readonly PaystackSettingsService $paystackSettings,
+    ) {}
 
     public function initialize(User $user, array $items): array
     {
@@ -43,7 +46,7 @@ class ShopOrderService
             return $order;
         });
 
-        $secret = (string) config('services.paystack.secret_key');
+        $secret = $this->paystackSettings->credentials()['secret_key'];
         if ($secret === '') {
             $order->update(['status' => 'failed']);
             throw ValidationException::withMessages(['payment' => ['Paystack is not configured on the server yet.']]);
@@ -73,7 +76,7 @@ class ShopOrderService
             return $this->payload($order);
         }
 
-        $response = Http::withToken((string) config('services.paystack.secret_key'))->acceptJson()->get((string) config('services.paystack.base_url').'/transaction/verify/'.urlencode($reference));
+        $response = Http::withToken($this->paystackSettings->credentials()['secret_key'])->acceptJson()->get((string) config('services.paystack.base_url').'/transaction/verify/'.urlencode($reference));
         $payment = $response->json();
         $paymentData = data_get($payment, 'data');
         if (! $response->successful() || ! data_get($payment, 'status') || data_get($paymentData, 'status') !== 'success' || (int) data_get($paymentData, 'amount') !== $order->total * 100) {

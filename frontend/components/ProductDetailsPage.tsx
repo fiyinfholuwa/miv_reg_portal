@@ -115,7 +115,7 @@ export default function ProductDetailsPage({ slug }: { slug: string }) {
           {inCart > 0 && <Link href="/shop/cart" className="mt-4 text-center text-sm font-bold text-[#a82e26]">{inCart} in your cart · View cart →</Link>}
           <ul className="m-0 mt-7 grid gap-2 border-t border-[#e4e7ec] p-0 pt-6 text-sm text-[#4d5460]">
             <li className="flex gap-2"><span aria-hidden="true">💳</span>Pay securely online with Paystack.</li>
-            <li className="flex gap-2"><span aria-hidden="true">📦</span>Collect at the conference store with your pickup barcode.</li>
+            <li className="flex gap-2"><span aria-hidden="true">📦</span>Collect at the conference store with your pickup QR code.</li>
           </ul>
         </div>
       </div> : productsLoaded ? <div className="flex flex-col items-center gap-4 rounded-[28px] border border-[#e4e7ec] bg-white p-10 text-center">

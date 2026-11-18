@@ -58,6 +58,8 @@ Route::prefix('admin')->group(function (): void {
         Route::post('/shop/orders/collect', [AdminOperationsController::class, 'collectOrder']);
         Route::get('/account', [AdminOperationsController::class, 'account']);
         Route::put('/account', [AdminOperationsController::class, 'updateAccount']);
+        Route::get('/settings/paystack', [AdminOperationsController::class, 'paystackSettings']);
+        Route::put('/settings/paystack', [AdminOperationsController::class, 'updatePaystackSettings']);
         Route::put('/account/password', [AdminOperationsController::class, 'updatePassword']);
         Route::post('/account/sign-out-others', [AdminOperationsController::class, 'signOutOthers']);
         Route::post('/admins', [AdminOperationsController::class, 'createAdmin']);

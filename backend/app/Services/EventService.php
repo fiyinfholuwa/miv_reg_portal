@@ -10,7 +10,10 @@ use Illuminate\Validation\ValidationException;
 
 class EventService
 {
-    public function __construct(private readonly TeamService $teamService) {}
+    public function __construct(
+        private readonly TeamService $teamService,
+        private readonly UploadUrlService $uploadUrlService,
+    ) {}
 
     /**
      * @return list<array<string, mixed>>
@@ -98,6 +101,13 @@ class EventService
      */
     public function eventPayload(Event $event): array
     {
+        $eventImage = $this->uploadUrlService->imageUrl($event->image);
+        $publicity = $event->publicity ?? [];
+        $publicityAssets = array_values(array_map(
+            fn (array $asset): array => [...$asset, 'image' => $this->uploadUrlService->imageUrl($asset['image'] ?? null)],
+            is_array($publicity['assets'] ?? null) ? $publicity['assets'] : [],
+        ));
+
         return [
             'id' => $event->id,
             'slug' => $event->slug,
@@ -109,7 +119,7 @@ class EventService
             'starts_at' => $event->starts_at?->toIso8601String(),
             'ends_at' => $event->ends_at?->toIso8601String(),
             'location' => $event->location,
-            'image' => $event->image,
+            'image' => $eventImage,
             'attendance_options' => $event->attendance_options ?? [],
             'day_options' => $event->day_options ?? [],
             'offers_accommodation' => $event->offers_accommodation,
@@ -117,11 +127,14 @@ class EventService
             'stream_url' => $event->stream_url,
             'stream_title' => $event->stream_title,
             'stream_live' => $event->stream_live,
-            'hotels' => $event->hotels ?? [],
+            'hotels' => array_map(
+                fn (array $hotel): array => [...$hotel, 'image' => $this->uploadUrlService->imageUrl($hotel['image'] ?? null)],
+                is_array($event->hotels) ? $event->hotels : [],
+            ),
             'publicity' => [
-                'caption' => $event->publicity['caption'] ?? "I'm attending {$event->title}".($event->date_label !== 'Date TBA' ? " · {$event->date_label}" : '').'. Join me! #MIV',
-                'assets' => $event->publicity['assets'] ?? array_values(array_filter([
-                    $event->image ? ['title' => 'Event photo', 'image' => $event->image] : null,
+                'caption' => $publicity['caption'] ?? "I'm attending {$event->title}".($event->date_label !== 'Date TBA' ? " · {$event->date_label}" : '').'. Join me! #MIV',
+                'assets' => $publicityAssets ?: array_values(array_filter([
+                    $eventImage ? ['title' => 'Event photo', 'image' => $eventImage] : null,
                     ['title' => 'MIV logo', 'image' => '/images/miv-logo.png'],
                 ])),
             ],

@@ -8,8 +8,17 @@ import { Modal, formatDate, primaryButton, secondaryButton } from './table';
 
 type Profile = { id: number; name: string; email: string; phone: string | null; sessions: number; created_at: string | null };
 type AdminUser = { id: number; name: string; email: string; created_at: string | null };
+type PaystackSettings = { public_key: string; secret_key: string; secret_key_set: boolean };
+type SettingsTab = 'profile' | 'password' | 'paystack' | 'sessions' | 'team';
 
 const PASSWORD_HINT = 'At least 10 characters with letters and numbers.';
+const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'profile', label: 'Profile' },
+  { id: 'password', label: 'Password' },
+  { id: 'paystack', label: 'Paystack' },
+  { id: 'sessions', label: 'Sessions' },
+  { id: 'team', label: 'Admin team' },
+];
 
 function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
@@ -26,9 +35,11 @@ export function SettingsView({ onProfileChange }: { onProfileChange?: (profile: 
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [details, setDetails] = useState({ name: '', email: '', phone: '' });
   const [passwords, setPasswords] = useState({ current_password: '', password: '', password_confirmation: '' });
+  const [paystack, setPaystack] = useState<PaystackSettings | null>(null);
   const [adding, setAdding] = useState(false);
   const [newAdmin, setNewAdmin] = useState({ name: '', email: '', password: '' });
   const [busy, setBusy] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
 
   const load = useCallback(async () => {
     try {
@@ -38,6 +49,14 @@ export function SettingsView({ onProfileChange }: { onProfileChange?: (profile: 
     } catch (error) { toast.error(errorMessage(error, 'Could not load your account.')); }
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  const loadPaystack = useCallback(async () => {
+    try {
+      const data = await api('/admin/settings/paystack');
+      setPaystack({ ...data.settings, secret_key: '' });
+    } catch (error) { toast.error(errorMessage(error, 'Could not load Paystack settings.')); }
+  }, []);
+  useEffect(() => { void loadPaystack(); }, [loadPaystack]);
 
   const run = async (key: string, action: () => Promise<void>) => { setBusy(key); try { await action(); } finally { setBusy(null); } };
 
@@ -49,6 +68,16 @@ export function SettingsView({ onProfileChange }: { onProfileChange?: (profile: 
     if (passwords.password !== passwords.password_confirmation) { toast.warning('The new passwords do not match.'); return; }
     void run('password', async () => {
       try { const data = await api('/admin/account/password', { method: 'PUT', body: JSON.stringify(passwords) }); setPasswords({ current_password: '', password: '', password_confirmation: '' }); toast.success(data.message); await load(); } catch (error) { toast.error(errorMessage(error, 'Could not change your password.')); }
+    });
+  };
+
+  const savePaystack = (event: FormEvent<HTMLFormElement>) => { event.preventDefault();
+    void run('paystack', async () => {
+      try {
+        const data = await api('/admin/settings/paystack', { method: 'PUT', body: JSON.stringify({ public_key: paystack?.public_key || null, secret_key: paystack?.secret_key || null }) });
+        setPaystack({ ...data.settings, secret_key: '' });
+        toast.success(data.message);
+      } catch (error) { toast.error(errorMessage(error, 'Could not save Paystack settings.')); }
     });
   };
 
@@ -71,32 +100,49 @@ export function SettingsView({ onProfileChange }: { onProfileChange?: (profile: 
 
   return (
     <div className="grid gap-5">
-      <Section title="Profile" description="Your name and the email you sign in with.">
+      <div role="tablist" aria-label="Settings sections" className="no-scrollbar flex gap-1.5 overflow-x-auto rounded-2xl bg-white p-1.5 shadow-sm">
+        {SETTINGS_TABS.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} className={activeTab === tab.id ? 'shrink-0 rounded-xl bg-[#03284a] px-4 py-2.5 text-sm font-bold text-white transition' : 'shrink-0 rounded-xl px-4 py-2.5 text-sm font-bold text-ink/55 transition hover:bg-[#f4f5f7] hover:text-ink'}>{tab.label}</button>)}
+      </div>
+
+      {activeTab === 'profile' && <Section title="Profile" description="Your name and the email you sign in with.">
         <form onSubmit={saveProfile} className="grid gap-4 sm:grid-cols-2">
           <Field title="Full name"><input required value={details.name} onChange={(event) => setDetails({ ...details, name: event.target.value })} className={input} /></Field>
           <Field title="Phone"><input value={details.phone} onChange={(event) => setDetails({ ...details, phone: event.target.value })} className={input} /></Field>
           <Field title="Email (sign-in)" className="sm:col-span-2"><input required type="email" value={details.email} onChange={(event) => setDetails({ ...details, email: event.target.value })} className={input} /></Field>
           <div className="sm:col-span-2"><button type="submit" disabled={busy === 'profile'} className={primaryButton}>{busy === 'profile' ? 'Saving…' : 'Save profile'}</button></div>
         </form>
-      </Section>
+      </Section>}
 
-      <Section title="Password" description={`${PASSWORD_HINT} Changing it signs you out everywhere else.`}>
+      {activeTab === 'password' && <Section title="Password" description={`${PASSWORD_HINT} Changing it signs you out everywhere.`}>
         <form onSubmit={savePassword} className="grid gap-4 sm:grid-cols-2">
           <Field title="Current password" className="sm:col-span-2"><PasswordInput required autoComplete="current-password" value={passwords.current_password} onChange={(event) => setPasswords({ ...passwords, current_password: event.target.value })} className={input} /></Field>
           <Field title="New password"><PasswordInput required minLength={10} autoComplete="new-password" value={passwords.password} onChange={(event) => setPasswords({ ...passwords, password: event.target.value })} className={input} /></Field>
           <Field title="Confirm new password"><PasswordInput required minLength={10} autoComplete="new-password" value={passwords.password_confirmation} onChange={(event) => setPasswords({ ...passwords, password_confirmation: event.target.value })} className={input} /></Field>
           <div className="sm:col-span-2"><button type="submit" disabled={busy === 'password'} className={primaryButton}>{busy === 'password' ? 'Changing…' : 'Change password'}</button></div>
         </form>
-      </Section>
+      </Section>}
 
-      <Section title="Sessions" description="Devices currently signed in to admin with your account.">
+      {activeTab === 'paystack' && <Section title="Paystack" description="Set the keys used by the backend to initialize and verify shop payments.">
+        {paystack ? (
+          <form onSubmit={savePaystack} className="grid gap-4 sm:grid-cols-2">
+            <Field title="Public key"><input value={paystack.public_key} onChange={(event) => setPaystack({ ...paystack, public_key: event.target.value })} className={input} placeholder="pk_live_…" autoComplete="off" /></Field>
+            <Field title="Secret key"><PasswordInput value={paystack.secret_key} onChange={(event) => setPaystack({ ...paystack, secret_key: event.target.value })} className={input} placeholder={paystack.secret_key_set ? 'Leave blank to keep the current key' : 'sk_live_…'} autoComplete="new-password" /></Field>
+            <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3">
+              <p className="m-0 text-xs text-ink/50">{paystack.secret_key_set ? 'Secret key is configured and stored securely. It is never displayed.' : 'No secret key is configured yet.'}</p>
+              <button type="submit" disabled={busy === 'paystack'} className={primaryButton}>{busy === 'paystack' ? 'Saving…' : 'Save Paystack keys'}</button>
+            </div>
+          </form>
+        ) : <div className="h-24 animate-pulse rounded-xl bg-[#fafaf8]" />}
+      </Section>}
+
+      {activeTab === 'sessions' && <Section title="Sessions" description="Devices currently signed in to admin with your account.">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#fafaf8] p-4">
           <span className="text-sm"><strong>{profile.sessions}</strong> active session{profile.sessions === 1 ? '' : 's'} (including this one)</span>
           <button type="button" onClick={signOutOthers} disabled={busy === 'sessions' || profile.sessions <= 1} className={secondaryButton}>{busy === 'sessions' ? 'Signing out…' : 'Sign out other sessions'}</button>
         </div>
-      </Section>
+      </Section>}
 
-      <Section title="Admin team" description="People who can sign in to this admin dashboard.">
+      {activeTab === 'team' && <Section title="Admin team" description="People who can sign in to this admin dashboard.">
         <ul className="m-0 grid list-none gap-2 p-0">
           {admins.map((admin) => (
             <li key={admin.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-[#fafaf8] p-3">
@@ -107,7 +153,7 @@ export function SettingsView({ onProfileChange }: { onProfileChange?: (profile: 
           ))}
         </ul>
         <button type="button" onClick={() => setAdding(true)} className={`${secondaryButton} mt-3`}>+ Add admin</button>
-      </Section>
+      </Section>}
 
       {adding && (
         <Modal title="Add an admin" subtitle="They can sign in at /admin with this email and password." onClose={() => setAdding(false)} size="sm" footer={<><button type="button" onClick={() => setAdding(false)} className={secondaryButton}>Cancel</button><button type="submit" form="admin-form" disabled={busy === 'admin'} className={primaryButton}>{busy === 'admin' ? 'Adding…' : 'Add admin'}</button></>}>

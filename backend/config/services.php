@@ -17,6 +17,7 @@ return [
         'per_recipient_per_minute' => (int) env('ELASTICEMAIL_PER_RECIPIENT_PER_MINUTE', 2),
     ],
     'paystack' => [
+        'public_key' => env('PAYSTACK_PUBLIC_KEY'),
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
         'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
     ],

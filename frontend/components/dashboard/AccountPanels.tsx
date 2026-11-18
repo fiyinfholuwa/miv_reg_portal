@@ -4,7 +4,7 @@ import { variantLabel } from '../../lib/shop';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { AccountUser, fetchPhotoUrl, uploadPhoto } from '../../lib/events';
 import { api } from './ui';
-import Code128Barcode from '../shop/Code128Barcode';
+import QRCode from '../shop/QRCode';
 import { errorMessage, toast } from '../../lib/toast';
 
 type ShopOrder = { id: number; reference: string; status: string; total: number; currency: string; pickup_code: string | null; paid_at: string | null; created_at: string | null; items: { name: string; color?: string | null; size?: string | null; quantity: number; line_total: number }[] };
@@ -17,8 +17,8 @@ const PAGE_SIZE = 8;
 const orderDate = (order: ShopOrder) => order.created_at ? new Date(order.created_at).toLocaleDateString('en-NG', { dateStyle: 'medium' }) : '—';
 const itemLabel = (item: ShopOrder['items'][number]) => `${item.name}${variantLabel(item) ? ` (${variantLabel(item)})` : ''}`;
 
-/** Full-screen pickup pass: big scannable barcode on white for the store scanner. */
-function PickupBarcode({ order, onClose }: { order: ShopOrder; onClose: () => void }) {
+/** Full-screen pickup pass: big scannable QR code on white for the store scanner. */
+function PickupQRCode({ order, onClose }: { order: ShopOrder; onClose: () => void }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -35,7 +35,7 @@ function PickupBarcode({ order, onClose }: { order: ShopOrder; onClose: () => vo
           <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#f4f5f7] text-xl" aria-label="Close">×</button>
         </div>
         <div className="mt-5 rounded-2xl border border-ink/10 bg-white px-2 py-4 sm:px-4">
-          <Code128Barcode value={order.pickup_code} height={150} />
+          <QRCode value={order.pickup_code} size={260} />
           <p className="mt-3 text-center font-mono text-xl font-bold tracking-[.18em] sm:text-2xl">{order.pickup_code}</p>
         </div>
         <p className="mt-3 text-center text-xs text-ink/50">Turn your screen brightness up and hold the phone flat for the scanner.</p>
@@ -80,7 +80,7 @@ export function OrderHistory() {
     return (
       <div className="flex flex-col items-center gap-3 rounded-[1.5rem] border border-dashed border-ink/15 bg-white p-10 text-center">
         <p className="m-0 font-bold">No orders yet</p>
-        <p className="m-0 text-sm text-ink/55">Paid orders show here with a pickup barcode for the conference store.</p>
+        <p className="m-0 text-sm text-ink/55">Paid orders show here with a pickup QR code for the conference store.</p>
         <a href="/shop" className="mt-1 rounded-full bg-[#1469a9] px-5 py-2.5 text-sm font-bold text-white">Visit the shop</a>
       </div>
     );
@@ -130,7 +130,7 @@ export function OrderHistory() {
                 <span className="flex items-center justify-end gap-2">
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase lg:hidden ${STATUS_STYLES[order.status] ?? 'bg-[#f1f2f4] text-ink/60'}`}>{order.status}</span>
                   {canPickUp
-                    ? <button type="button" onClick={() => setScanning(order)} className="flex items-center gap-1.5 rounded-full bg-[#03284a] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#0b4779]"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 6v12M8 6v12M11 6v12M15 6v12M18 6v12M20 6v12" /></svg><span className="hidden sm:inline">View barcode</span><span className="sm:hidden">Barcode</span></button>
+                    ? <button type="button" onClick={() => setScanning(order)} className="flex items-center gap-1.5 rounded-full bg-[#03284a] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#0b4779]"><span aria-hidden="true">▦</span><span className="hidden sm:inline">View QR code</span><span className="sm:hidden">QR code</span></button>
                     : <span className="hidden text-xs text-ink/40 lg:inline">Not available</span>}
                 </span>
               </div>
@@ -162,7 +162,7 @@ export function OrderHistory() {
         </div>
       )}
 
-      {scanning && <PickupBarcode order={scanning} onClose={() => setScanning(null)} />}
+      {scanning && <PickupQRCode order={scanning} onClose={() => setScanning(null)} />}
     </div>
   );
 }

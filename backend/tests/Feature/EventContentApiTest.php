@@ -7,6 +7,7 @@ use App\Models\Testimonial;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -89,16 +90,49 @@ class EventContentApiTest extends TestCase
     public function test_admin_uploads_an_image_to_public_storage(): void
     {
         Storage::fake('uploads');
+        Config::set('filesystems.disks.uploads.url', 'https://api.example.test');
 
         $response = $this->withToken($this->adminToken())->post('/api/admin/uploads', ['image' => UploadedFile::fake()->image('flyer.jpg', 800, 800)], ['Accept' => 'application/json'])
             ->assertCreated();
 
         Storage::disk('uploads')->assertExists($response->json('path'));
-        $this->assertStringContainsString('/uploads/', $response->json('url'));
+        $this->assertStringStartsWith('https://api.example.test/uploads/', $response->json('url'));
 
         $this->withToken($this->adminToken())->post('/api/admin/uploads', ['image' => UploadedFile::fake()->create('notes.pdf', 10, 'application/pdf')], ['Accept' => 'application/json'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['image' => 'Upload a JPG, PNG or WebP image.']);
+    }
+
+    public function test_legacy_upload_urls_are_rewritten_to_the_public_backend_origin(): void
+    {
+        Config::set('filesystems.disks.uploads.url', 'https://api.example.test');
+        Config::set('filesystems.disks.uploads.public_url', 'https://api.example.test');
+        $event = Event::factory()->create([
+            'image' => 'http://localhost:8000/storage/uploads/2026/11/event.jpg',
+            'publicity' => ['caption' => 'Join us', 'assets' => [['title' => 'Template', 'image' => 'http://localhost:8000/storage/uploads/2026/11/template.jpg']]],
+            'hotels' => [['name' => 'Lodge', 'image' => 'http://localhost:8000/storage/uploads/2026/11/hotel.jpg']],
+        ]);
+
+        $this->getJson("/api/events/{$event->slug}")
+            ->assertOk()
+            ->assertJsonPath('event.image', 'https://api.example.test/uploads/2026/11/event.jpg')
+            ->assertJsonPath('event.publicity.assets.0.image', 'https://api.example.test/uploads/2026/11/template.jpg')
+            ->assertJsonPath('event.hotels.0.image', 'https://api.example.test/uploads/2026/11/hotel.jpg');
+    }
+
+    public function test_upload_url_uses_the_forwarded_public_backend_host_when_no_hint_is_set(): void
+    {
+        Storage::fake('uploads');
+        Config::set('filesystems.disks.uploads.public_url', null);
+        Config::set('filesystems.disks.uploads.url', 'http://localhost:8000');
+        Config::set('app.url', 'http://localhost:8000');
+
+        $response = $this->withToken($this->adminToken())
+            ->withHeaders(['X-Forwarded-Host' => 'api.example.test', 'X-Forwarded-Proto' => 'https'])
+            ->post('/api/admin/uploads', ['image' => UploadedFile::fake()->image('forwarded.jpg')], ['Accept' => 'application/json'])
+            ->assertCreated();
+
+        $this->assertStringStartsWith('https://api.example.test/uploads/', $response->json('url'));
     }
 
     public function test_delegates_see_their_own_pending_testimonies_but_only_published_ones_publicly(): void

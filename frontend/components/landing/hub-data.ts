@@ -65,6 +65,10 @@ export const MIV_ABOUT_URL = 'https://menofissacharvision.com/about.html';
 export const naira =(value: number) => `₦${Math.round(value).toLocaleString('en-NG')}`;
 
 export function openRegistration(detail: { event?: string; mode?: 'login' }) {
+  if (detail.event) {
+    const url = new URL(`/events/${encodeURIComponent(detail.event)}#register`, window.location.origin);
+    window.history.pushState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }
   window.dispatchEvent(new CustomEvent('open-registration-modal', { detail }));
 }
 

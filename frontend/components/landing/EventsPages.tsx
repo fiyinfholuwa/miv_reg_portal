@@ -72,6 +72,18 @@ export function EventDetailPage({ slug }: { slug: string }) {
   const index = events.findIndex((item) => item.slug === slug);
   const event = events[index];
   const [registered, setRegistered] = useState(false);
+  const [showDetails, setShowDetails] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const update = () => setShowDetails(window.location.hash !== '#register');
+    update();
+    window.addEventListener('hashchange', update);
+    window.addEventListener('popstate', update);
+    return () => {
+      window.removeEventListener('hashchange', update);
+      window.removeEventListener('popstate', update);
+    };
+  }, []);
 
   useEffect(() => {
     if (!readSession()) return;
@@ -81,7 +93,7 @@ export function EventDetailPage({ slug }: { slug: string }) {
   return (
     <main className="miv-hub">
       <RegistrationModal defaultEvent={slug} />
-      {event ? (
+      {showDetails && event ? (
         <div className="p-2.5 sm:p-4">
           <section className="relative min-h-[560px] overflow-hidden rounded-[26px] bg-[#001428] text-[#faf6ec] sm:min-h-[620px] sm:rounded-[28px]">
             {event.image && <img src={event.image} alt="" className="absolute inset-0 h-full w-full object-cover" />}
@@ -104,7 +116,7 @@ export function EventDetailPage({ slug }: { slug: string }) {
             </div>
           </section>
         </div>
-      ) : (
+      ) : showDetails ? (
         <>
           <div className="p-2.5 sm:p-4"><HubNav registerSlug={nextEventSlug(events)} variant="solid" /></div>
           <section className="flex flex-col items-center gap-4 px-5 py-24 text-center">
@@ -113,8 +125,8 @@ export function EventDetailPage({ slug }: { slug: string }) {
             <Link href="/events" className="rounded-full bg-[#00203f] px-7 py-[15px] text-[15px] font-bold text-white">View all events</Link>
           </section>
         </>
-      )}
-      <HubFooter />
+      ) : null}
+      {showDetails && <HubFooter />}
     </main>
   );
 }

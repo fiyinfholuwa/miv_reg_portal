@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Venue desk operations. Staff scan (or type) a delegate's ticket barcode to
+ * Venue desk operations. Staff scan (or type) a delegate's ticket QR code to
  * check them in and to serve meals; each meal can be served once per person
  * per day (Lagos time).
  */

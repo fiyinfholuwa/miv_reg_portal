@@ -18,7 +18,10 @@ class EventContentService
     private const UPLOAD_DISK = 'uploads';
     private const UPLOAD_DIRECTORY = 'uploads';
 
-    public function __construct(private readonly EventService $eventService) {}
+    public function __construct(
+        private readonly EventService $eventService,
+        private readonly UploadUrlService $uploadUrlService,
+    ) {}
 
     /**
      * @return list<array<string, mixed>>
@@ -32,7 +35,6 @@ class EventContentService
             ->get()
             ->map(fn (Event $event): array => [
                 ...$this->eventService->eventPayload($event),
-                'publicity' => $event->publicity ?? ['caption' => null, 'assets' => []],
                 'registrations_count' => $event->registrations_count,
                 'sort_order' => $event->sort_order,
             ])
@@ -152,7 +154,6 @@ class EventContentService
     {
         return [
             ...$this->eventService->eventPayload($event),
-            'publicity' => $event->publicity ?? ['caption' => null, 'assets' => []],
             'registrations_count' => $event->registrations()->count(),
         ];
     }
@@ -184,12 +185,8 @@ class EventContentService
 
     private function uploadUrl(string $path): string
     {
-        // The API request host belongs to the backend, even when the browser
-        // itself is running on a different frontend domain.
-        $baseUrl = app()->bound('request')
-            ? request()->getSchemeAndHttpHost()
-            : config('app.url', 'http://localhost');
-
-        return rtrim((string) $baseUrl, '/').'/'.ltrim($path, '/');
+        // Use the configured public backend origin. The request host can be
+        // an internal localhost/proxy address in production.
+        return $this->uploadUrlService->url($path);
     }
 }

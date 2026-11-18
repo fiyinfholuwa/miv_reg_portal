@@ -8,6 +8,7 @@ use App\Http\Requests\AdminProfileRequest;
 use App\Http\Requests\AdminUserRequest;
 use App\Http\Requests\BulkReviewRequest;
 use App\Http\Requests\MealRedemptionRequest;
+use App\Http\Requests\PaystackSettingsRequest;
 use App\Http\Requests\TeamMembersRequest;
 use App\Http\Requests\TeamRequest;
 use App\Models\Event;
@@ -19,6 +20,7 @@ use App\Services\AdminService;
 use App\Services\CheckInService;
 use App\Services\RegistrantService;
 use App\Services\RegistrationService;
+use App\Services\PaystackSettingsService;
 use App\Services\ShopOrderService;
 use App\Services\TeamService;
 use Illuminate\Http\JsonResponse;
@@ -36,6 +38,7 @@ class AdminOperationsController extends Controller
         private readonly TeamService $teamService,
         private readonly CheckInService $checkInService,
         private readonly AdminAccountService $accountService,
+        private readonly PaystackSettingsService $paystackSettings,
     ) {}
 
     public function registrants(Request $request): JsonResponse
@@ -166,6 +169,20 @@ class AdminOperationsController extends Controller
         $this->adminService->ensureAdmin($request->user());
 
         return response()->json($this->accountService->updateProfile($request->user(), $request->validated()));
+    }
+
+    public function paystackSettings(Request $request): JsonResponse
+    {
+        $this->adminService->ensureAdmin($request->user());
+
+        return response()->json(['settings' => $this->paystackSettings->settings()]);
+    }
+
+    public function updatePaystackSettings(PaystackSettingsRequest $request): JsonResponse
+    {
+        $this->adminService->ensureAdmin($request->user());
+
+        return response()->json($this->paystackSettings->save($request->validated()));
     }
 
     public function updatePassword(AdminPasswordRequest $request): JsonResponse

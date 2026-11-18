@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import AttendingCardStudio from '../attending/AttendingCardStudio';
 import { AccountUser, EventRegistration, Hotel, MivEvent, eventPageUrl, needsAttendanceStep, registerForEvent } from '../../lib/events';
 import { SessionState, dayLabel, defaultDayIndex, formatTime, lagosNow, sessionStart, sessionStates } from '../../lib/programme';
-import Code128Barcode from '../shop/Code128Barcode';
+import QRCode from '../shop/QRCode';
 import { Countdown, api } from './ui';
 import { errorMessage, toast } from '../../lib/toast';
 import { Icon } from './DashboardChrome';
@@ -179,10 +179,10 @@ function PassPanel({ registration, profile, onRegistrationChange }: { registrati
           <h2 className="font-display text-3xl uppercase">My pass</h2>
           <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[.12em] text-[#9bc4e5]">Admit one</span>
         </div>
-        <p className="mt-1 text-xs text-[#9bc4e5]">Show this barcode at the welcome desk.</p>
+        <p className="mt-1 text-xs text-[#9bc4e5]">Show this QR code at the welcome desk.</p>
         <div className="mt-5 overflow-hidden rounded-[1.5rem] bg-white text-ink">
           <div className="border-b border-dashed border-[#d9c99e] p-5"><p className="font-bold leading-tight">{event.short_name}</p><p className="text-xs text-ink/50">{event.date_label}{event.location ? ` · ${event.location}` : ''}</p></div>
-          <div className="px-4 pt-5 sm:px-6"><Code128Barcode value={registration.ticket_code} height={110} /></div>
+          <div className="px-4 pt-5 sm:px-6"><QRCode value={registration.ticket_code} size={190} /></div>
           <p className="pb-5 pt-3 text-center font-mono text-lg font-bold tracking-[.16em] sm:text-xl">{registration.ticket_code}</p>
           <div className="grid grid-cols-3 border-t border-[#e7dcc1] text-xs"><div className="p-4"><span className="block uppercase text-ink/45">Name</span><strong className="mt-1 block break-words">{profile.name}</strong></div><div className="border-x border-[#e7dcc1] p-4"><span className="block uppercase text-ink/45">Type</span><strong className="mt-1 block">{profile.role || 'Delegate'}</strong></div><div className="p-4"><span className="block uppercase text-ink/45">Mode</span><strong className="mt-1 block">{registration.attendance_mode || '—'}</strong></div></div>
         </div>
@@ -405,15 +405,45 @@ function PublicityPanel({ event, go }: { event: MivEvent; go: (href: string) => 
   const download = async () => {
     if (!selected) return;
     try {
-      const blob = await (await fetch(selected.image)).blob();
+      const response = await fetch(selected.image);
+      if (!response.ok) throw new Error('Could not fetch the publicity image.');
+      const blob = await response.blob();
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
+      const objectUrl = URL.createObjectURL(blob);
+      link.href = objectUrl;
       link.download = `${event.short_name}-${selected.title}`.toLowerCase().replace(/[^a-z0-9]+/g, '-') + (blob.type.includes('png') ? '.png' : '.jpg');
       link.click();
-      URL.revokeObjectURL(link.href);
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     } catch {
       window.open(selected.image, '_blank', 'noopener');
     }
+  };
+
+  const shareOnWhatsApp = async () => {
+    if (!selected) return;
+    const eventUrl = eventPageUrl(event.slug);
+    const shareText = caption.includes(eventUrl) ? caption : `${caption} ${eventUrl}`;
+    try {
+      const response = await fetch(selected.image);
+      if (!response.ok) throw new Error('Could not fetch the publicity image.');
+      const blob = await response.blob();
+      const extension = blob.type.includes('png') ? 'png' : 'jpg';
+      const file = new File([blob], `${event.short_name}-${selected.title}`.toLowerCase().replace(/[^a-z0-9]+/g, '-') + `.${extension}`, { type: blob.type || `image/${extension}` });
+      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+        try {
+          await navigator.share({ title: `${event.short_name} publicity`, text: shareText, files: [file] });
+          return;
+        } catch (shareError) {
+          if (shareError instanceof DOMException && shareError.name === 'AbortError') return;
+        }
+      }
+    } catch {
+      // The fallback below still gives desktop users the image and message.
+    }
+
+    await download();
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener,noreferrer');
+    toast.info('The image was downloaded. Attach it to the WhatsApp message.');
   };
 
   return (
@@ -430,7 +460,7 @@ function PublicityPanel({ event, go }: { event: MivEvent; go: (href: string) => 
           <button type="button" onClick={() => void copy()} className="rounded-full bg-[#1469a9] px-4 py-3 text-sm font-bold text-white">Copy caption</button>
           <button type="button" onClick={() => void download()} disabled={!selected} className="rounded-full border border-ink/15 px-4 py-3 text-sm font-bold text-[#0b4779] disabled:opacity-40">Download</button>
         </div>
-        <a href={`https://wa.me/?text=${encodeURIComponent(`${caption} ${eventPageUrl(event.slug)}`)}`} target="_blank" rel="noreferrer" className="mt-2 block rounded-full bg-[#dff2e5] px-4 py-3 text-center text-sm font-bold text-[#2f7d4f]">Share on WhatsApp</a>
+        <button type="button" onClick={() => void shareOnWhatsApp()} disabled={!selected} className="mt-2 block w-full rounded-full bg-[#dff2e5] px-4 py-3 text-center text-sm font-bold text-[#2f7d4f] disabled:opacity-40">Share image on WhatsApp</button>
       </aside>
     </div>
   );
