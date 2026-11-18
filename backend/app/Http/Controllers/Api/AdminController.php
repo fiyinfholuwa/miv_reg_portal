@@ -11,6 +11,7 @@ use App\Http\Requests\EventDetailsRequest;
 use App\Http\Requests\PartnerInquiryReviewRequest;
 use App\Http\Requests\ReviewRequest;
 use App\Http\Requests\ShopProductRequest;
+use App\Models\Broadcast;
 use App\Models\Event;
 use App\Models\PartnerInquiry;
 use App\Models\ShopProduct;
@@ -113,6 +114,11 @@ class AdminController extends Controller
     public function createBroadcast(BroadcastRequest $request): JsonResponse
     {
         return response()->json($this->adminService->createBroadcast($request->user(), $request->validated()), 201);
+    }
+
+    public function deleteBroadcast(Request $request, Broadcast $broadcast): JsonResponse
+    {
+        return response()->json($this->adminService->deleteBroadcast($request->user(), $broadcast));
     }
 
     public function shopProducts(Request $request): JsonResponse

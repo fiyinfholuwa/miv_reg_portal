@@ -138,11 +138,16 @@ class RegistrationApiTest extends TestCase
 
         $this->withToken($token)->getJson('/api/admin/overview')->assertOk()->assertJsonStructure(['registered', 'onsite', 'online', 'daily']);
 
-        $this->withToken($token)->postJson('/api/admin/broadcasts', [
+        $broadcast = $this->withToken($token)->postJson('/api/admin/broadcasts', [
             'title' => 'Gate update',
             'body' => 'Gate B opens at 1:15 PM.',
             'status' => 'sent',
-        ])->assertCreated()->assertJsonPath('message', 'Broadcast saved.');
+        ])->assertCreated()->assertJsonPath('message', 'Broadcast saved.')->json();
+
+        $this->withToken($token)->deleteJson("/api/admin/broadcasts/{$broadcast['id']}")
+            ->assertOk()
+            ->assertJsonPath('message', 'Broadcast deleted.');
+        $this->assertDatabaseMissing('broadcasts', ['id' => $broadcast['id']]);
     }
 
     public function test_send_now_broadcast_delivers_to_completed_verified_delegates(): void

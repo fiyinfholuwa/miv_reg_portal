@@ -5,7 +5,7 @@ import { errorMessage, toast } from '../../lib/toast';
 import { api } from './adminApi';
 import { Field, card, input } from './adminUi';
 import { useEventOptions } from './PeopleViews';
-import { Badge, DataTable, Modal, Pagination, StatusBadge, StatusTabs, TableToolbar, formatDate, primaryButton, secondaryButton, useClientTable, type Column } from './table';
+import { Badge, DataTable, Modal, Pagination, StatusBadge, StatusTabs, TableToolbar, dangerButton, formatDate, primaryButton, secondaryButton, useClientTable, type Column } from './table';
 
 const MEALS = ['Breakfast', 'Lunch', 'Dinner'] as const;
 
@@ -168,7 +168,18 @@ export function BroadcastsView() {
     } catch (error) { toast.error(errorMessage(error, 'Could not save the broadcast.')); } finally { setSaving(false); }
   };
 
+  const remove = async (item: Broadcast) => {
+    if (!window.confirm(`Delete “${item.title}”? This removes it from delegates’ dashboards. Emails already sent cannot be recalled.`)) return;
+    try {
+      await api(`/admin/broadcasts/${item.id}`, { method: 'DELETE' });
+      setReading((current) => current?.id === item.id ? null : current);
+      toast.success('Broadcast deleted.');
+      await load();
+    } catch (error) { toast.error(errorMessage(error, 'Could not delete the broadcast.')); }
+  };
+
   const columns: Column<Broadcast>[] = [
+    { key: 'actions', header: <span className="sr-only">Actions</span>, className: 'text-right', cell: (item) => <div onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => void remove(item)} className={dangerButton}>Delete</button></div> },
     { key: 'title', header: 'Title', cell: (item) => <div className="min-w-0 max-w-[460px]"><strong className="block truncate">{item.title}</strong><span className="block truncate text-xs text-ink/50">{item.body}</span></div> },
     { key: 'status', header: 'Status', cell: (item) => <StatusBadge status={item.status} /> },
     { key: 'when', header: 'Date', cell: (item) => <span className="whitespace-nowrap text-ink/60">{item.status === 'scheduled' && item.scheduled_at ? `For ${formatDate(item.scheduled_at, true)}` : formatDate(item.created_at, true)}</span> },

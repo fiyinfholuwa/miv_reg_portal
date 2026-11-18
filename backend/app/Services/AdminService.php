@@ -183,6 +183,14 @@ class AdminService
         ];
     }
 
+    public function deleteBroadcast(User $admin, Broadcast $broadcast): array
+    {
+        $this->ensureAdmin($admin);
+        $broadcast->delete();
+
+        return ['message' => 'Broadcast deleted.'];
+    }
+
     public function shopProducts(User $admin): array
     {
         $this->ensureAdmin($admin);

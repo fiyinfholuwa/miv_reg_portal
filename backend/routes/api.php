@@ -67,6 +67,7 @@ Route::prefix('admin')->group(function (): void {
         Route::patch('/testimonials/{testimonial}/review', [AdminController::class, 'reviewTestimonial']);
         Route::get('/broadcasts', [AdminController::class, 'broadcasts']);
         Route::post('/broadcasts', [AdminController::class, 'createBroadcast']);
+        Route::delete('/broadcasts/{broadcast}', [AdminController::class, 'deleteBroadcast']);
         Route::get('/shop/products', [AdminController::class, 'shopProducts']);
         Route::post('/shop/products', [AdminController::class, 'createShopProduct']);
         Route::patch('/shop/products/{product}', [AdminController::class, 'updateShopProduct']);
