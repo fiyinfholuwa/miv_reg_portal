@@ -34,16 +34,24 @@ export default function InAppShop({ view, productSlug, go }: Props) {
             <p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#1469a9]">Shop · pay online, collect at the venue</p>
             <p className="mt-1 text-sm text-ink/60">Pick your colour and size, pay with Paystack, then show your pickup QR code at the store.</p>
           </div>
-          <ShopLink href={routes.cart} routes={routes} className="flex shrink-0 items-center justify-between gap-3 rounded-full bg-[#1469a9] py-2 pl-4 pr-2 text-sm font-bold text-white transition hover:bg-[#0b4779]">
-            <span>Cart · {naira(shop.total)}</span>
-            <span className="grid h-8 min-w-8 place-items-center rounded-full bg-white px-2 text-xs text-[#0b4779]">{shop.count}</span>
-          </ShopLink>
         </div>
       )}
 
       {view === 'catalog' && <ShopCatalog shop={shop} routes={routes} variant="app" />}
       {view === 'product' && productSlug && <ProductDetail shop={shop} slug={productSlug} routes={routes} variant="app" />}
       {view === 'cart' && <CartView shop={shop} routes={routes} variant="app" />}
+
+      {/* Floating cart: always reachable while browsing; sits above the phone tab bar. */}
+      {view !== 'cart' && (
+        <ShopLink href={routes.cart} routes={routes} className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex items-center gap-2 rounded-full bg-[#1469a9] py-2 pl-2 pr-4 text-sm font-bold text-white shadow-[0_12px_30px_rgba(3,40,74,.3)] transition hover:bg-[#0b4779] sm:right-6 lg:bottom-8 lg:right-10">
+          <span className="relative grid h-10 w-10 place-items-center rounded-full bg-white text-[#0b4779]">
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1" /><circle cx="18" cy="20" r="1" /><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.5h7.8a2 2 0 0 0 1.9-1.4L21 8H6" /></svg>
+            {shop.count > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#a82e26] px-1 text-[10px] font-bold text-white">{shop.count}</span>}
+          </span>
+          <span>{naira(shop.total)}</span>
+          <span className="sr-only">Open cart, {shop.count} item{shop.count === 1 ? '' : 's'}</span>
+        </ShopLink>
+      )}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import QRCode from '../shop/QRCode';
 
 type Route =
   | { kind: 'home' }
+  | { kind: 'events' }
   | { kind: 'event'; slug: string; tabSlug?: string }
   | { kind: 'shop'; view: 'catalog' | 'cart' | 'product'; productSlug?: string }
   | { kind: 'order-history' | 'profile' }
@@ -26,6 +27,7 @@ function parseRoute(pathname: string): Route {
   const [, , section, slug, tab] = pathname.split('/');
   if (!section) return { kind: 'home' };
   if (section === 'events' && slug) return { kind: 'event', slug, tabSlug: tab };
+  if (section === 'events') return { kind: 'events' };
   // /dashboard/store is the old address of the shop.
   if (section === 'shop' || section === 'store') {
     if (!slug) return { kind: 'shop', view: 'catalog' };
@@ -110,15 +112,15 @@ export default function UserDashboardFunctional() {
   const activeTab: EventTab | null = activeRegistration ? tabFromSlug(activeRegistration.event, route.kind === 'event' ? route.tabSlug : undefined) : null;
   const firstName = profile.name.split(' ')[0];
   const initials = profile.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
-  const title = route.kind === 'home' ? `Hello, ${firstName}` : route.kind === 'event' ? (activeRegistration?.event.short_name ?? 'Event') : route.kind === 'shop' ? (route.view === 'cart' ? 'Your cart' : 'Shop') : route.kind === 'legacy' ? '' : ACCOUNT_TITLES[route.kind];
-  const subtitle = route.kind === 'home' ? `${registrations.length} event${registrations.length === 1 ? '' : 's'} registered` : route.kind === 'event' ? activeRegistration?.event.date_label : route.kind === 'shop' ? 'Pay online, collect at the venue' : route.kind === 'order-history' ? 'Your shop orders and pickup codes' : 'Your details and attending-card photo';
+  const title = route.kind === 'home' ? `Hello, ${firstName}` : route.kind === 'event' ? (activeRegistration?.event.short_name ?? 'Event') : route.kind === 'shop' ? (route.view === 'cart' ? 'Your cart' : 'Shop') : route.kind === 'events' ? 'Events' : route.kind === 'legacy' ? '' : ACCOUNT_TITLES[route.kind];
+  const subtitle = route.kind === 'home' ? `${registrations.length} event${registrations.length === 1 ? '' : 's'} registered` : route.kind === 'event' ? activeRegistration?.event.date_label : route.kind === 'shop' ? 'Pay online, collect at the venue' : route.kind === 'events' ? 'Every MIV gathering in one place' : route.kind === 'order-history' ? 'Your shop orders and pickup codes' : 'Your details and attending-card photo';
   // Inside an event the workspace shows its own bottom bar; elsewhere the dashboard one.
   const eventNavShown = route.kind === 'event' && Boolean(activeRegistration && activeTab);
 
   const sideLink = (active: boolean) => `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${active ? 'bg-[#e7f1fa] text-[#0b4779]' : 'text-ink/70 hover:bg-ink/5 hover:text-ink'}`;
   const bottomItems = [
     { key: 'home', label: 'Home', icon: 'home' as const, active: route.kind === 'home', onClick: () => go('/dashboard') },
-    { key: 'events', label: 'Events', icon: 'compass' as const, active: false, onClick: () => window.location.assign('/events') },
+    { key: 'events', label: 'Events', icon: 'compass' as const, active: route.kind === 'events', onClick: () => go('/dashboard/events') },
     { key: 'shop', label: 'Shop', icon: 'bag' as const, active: route.kind === 'shop', onClick: () => go('/dashboard/shop') },
     { key: 'orders', label: 'Orders', icon: 'receipt' as const, active: route.kind === 'order-history', onClick: () => go('/dashboard/order-history') },
     { key: 'profile', label: 'Profile', icon: 'user' as const, active: route.kind === 'profile', onClick: () => go('/dashboard/profile') },
@@ -139,7 +141,7 @@ export default function UserDashboardFunctional() {
               <EventSwitcher registrations={registrations} activeSlug={activeSlug} go={go} />
             </div>
           )}
-          <a href="/events" className={`${sideLink(false)} mt-2 text-[#1469a9]`}><Icon name="search" />Find more events</a>
+          <button type="button" onClick={() => go('/dashboard/events')} className={`${sideLink(route.kind === 'events')} mt-2`}><Icon name="compass" className="text-[#1469a9]" />All events</button>
 
           <p className="mb-1 mt-6 px-3 text-[11px] font-bold uppercase tracking-[.14em] text-ink/40">Account</p>
           <button type="button" onClick={() => go('/dashboard/profile')} className={sideLink(route.kind === 'profile')}><Icon name="user" className="text-[#1469a9]" />Profile</button>
@@ -176,6 +178,7 @@ export default function UserDashboardFunctional() {
             {route.kind === 'event' && activeRegistration && activeTab && <EventWorkspace registration={activeRegistration} profile={profile} tab={activeTab} welcome={welcome} go={go} onRegistrationChange={(updated) => setRegistrations((current) => current.map((item) => item.id === updated.id ? updated : item))} onPhotoSaved={() => setProfile((current) => current ? { ...current, has_photo: true } : current)} />}
             {route.kind === 'event' && activeRegistration && !activeTab && <NotFound text="That section isn’t available for this event." action={() => go(`/dashboard/events/${activeRegistration.event.slug}`)} actionLabel="Back to event" />}
             {route.kind === 'event' && !activeRegistration && <NotRegistered slug={route.slug} event={catalog.find((event) => event.slug === route.slug)} />}
+            {route.kind === 'events' && <AllEvents catalog={catalog} registrations={registrations} go={go} />}
             {route.kind === 'profile' && <Profile profile={profile} onSaved={setProfile} onLogout={() => void logout()} />}
             {route.kind === 'order-history' && <OrderHistory />}
             {route.kind === 'shop' && <InAppShop view={route.view} productSlug={route.productSlug} go={go} />}
@@ -283,6 +286,48 @@ function EventCard({ registration, go }: { registration: EventRegistration; go: 
         </div>
       </div>
     </article>
+  );
+}
+
+/** Every published event, with what the person can do for each: open it or register. */
+function AllEvents({ catalog, registrations, go }: { catalog: MivEvent[]; registrations: EventRegistration[]; go: (href: string) => void }) {
+  const [filter, setFilter] = useState<'all' | 'mine' | 'open'>('all');
+  const registered = new Set(registrations.map((registration) => registration.event.slug));
+  const events = catalog.filter((event) => filter === 'all' || (filter === 'mine' ? registered.has(event.slug) : event.registration_open && !registered.has(event.slug)));
+  const chip = (value: typeof filter, label: string) => <button type="button" onClick={() => setFilter(value)} aria-pressed={filter === value} className={`min-h-10 shrink-0 rounded-full px-4 text-xs font-bold transition ${filter === value ? 'bg-[#03284a] text-white' : 'bg-white text-ink/65 ring-1 ring-ink/10'}`}>{label}</button>;
+
+  return (
+    <div className="grid gap-4">
+      <div className="no-scrollbar flex gap-2 overflow-x-auto">{chip('all', 'All events')}{chip('mine', 'Registered')}{chip('open', 'Open to join')}</div>
+      {catalog.length === 0 && <div className="h-40 animate-pulse rounded-[1.25rem] bg-white" />}
+      {catalog.length > 0 && events.length === 0 && <p className="rounded-2xl bg-white p-6 text-sm text-ink/55">No events here yet.</p>}
+      <div className="grid gap-3 sm:gap-4 md:grid-cols-2 2xl:grid-cols-3">
+        {events.map((event) => {
+          const isMine = registered.has(event.slug);
+          return (
+            <article key={event.slug} className="flex overflow-hidden rounded-[1.25rem] border border-ink/10 bg-white sm:flex-col">
+              <div className="relative w-28 shrink-0 bg-[#03284a] sm:h-40 sm:w-full">
+                {event.image && <img src={event.image} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+                {isMine && <span className="absolute left-2 top-2 rounded-full bg-[#dff2e5] px-2.5 py-1 text-[11px] font-bold text-[#2f7d4f]">Registered</span>}
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col p-3.5 sm:p-5">
+                <span className="text-xs font-semibold text-ink/50">{event.date_label}</span>
+                <h3 className="line-clamp-2 text-[15px] font-bold leading-snug sm:text-lg">{event.title}</h3>
+                {event.location && <p className="mt-0.5 truncate text-xs text-ink/55 sm:text-sm">{event.location}</p>}
+                {event.summary && <p className="mt-2 line-clamp-2 hidden text-sm text-ink/60 sm:block">{event.summary}</p>}
+                <div className="mt-auto flex flex-wrap gap-2 pt-3">
+                  {isMine
+                    ? <button type="button" onClick={() => go(`/dashboard/events/${event.slug}`)} className="min-h-10 rounded-full bg-[#1469a9] px-4 text-xs font-bold text-white">Open</button>
+                    : event.registration_open
+                      ? <button type="button" onClick={() => openRegistration(event.slug)} className="min-h-10 rounded-full bg-coral px-4 text-xs font-bold text-white">Register</button>
+                      : <span className="inline-flex min-h-10 items-center rounded-full bg-[#f1f2f4] px-4 text-xs font-bold text-ink/50">Registration closed</span>}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

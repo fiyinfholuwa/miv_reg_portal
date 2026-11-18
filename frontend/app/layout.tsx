@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Toaster from '../components/Toaster';
+import PushPrompt from '../components/PushPrompt';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body suppressHydrationWarning>
         {children}
         <Toaster />
+        <PushPrompt />
       </body>
     </html>
   );

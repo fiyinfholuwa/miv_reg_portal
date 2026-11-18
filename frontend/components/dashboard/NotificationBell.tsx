@@ -50,10 +50,13 @@ export default function NotificationBell({ go }: { go: (href: string) => void })
   useEffect(() => {
     void load();
     void registerServiceWorker().then(() => pushStatus()).then(setPush);
+    // Keep in sync when the arrival prompt turns push on.
+    const onPushChanged = (event: Event) => setPush((event as CustomEvent<PushStatus>).detail);
+    window.addEventListener('miv-push-changed', onPushChanged);
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(); }, POLL_MS);
     const onVisible = () => { if (document.visibilityState === 'visible') void load(); };
     document.addEventListener('visibilitychange', onVisible);
-    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('miv-push-changed', onPushChanged); };
   }, [load]);
 
   useEffect(() => {

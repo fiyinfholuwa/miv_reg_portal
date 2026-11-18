@@ -4,19 +4,13 @@ namespace App\Jobs;
 
 use App\Models\PushSubscription;
 use App\Services\Push\PushSender;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
 
 /**
  * Pushes one payload to the browsers of the given users, or to every
  * subscribed browser when $userIds is null (admin broadcasts).
  */
-class SendPushNotification implements ShouldQueue
+class SendPushNotification
 {
-    use Queueable;
-
-    public int $tries = 2;
-
     /**
      * @param  list<int>|null  $userIds
      * @param  array{title: string, body: string, url: string, tag: string}  $payload

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Broadcast;
 use App\Models\Event;
 use App\Models\PushSubscription;
 use App\Models\User;
@@ -9,6 +10,7 @@ use App\Services\Push\PushSender;
 use App\Services\Push\PushSettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class PushNotificationApiTest extends TestCase
@@ -133,6 +135,27 @@ class PushNotificationApiTest extends TestCase
         $this->assertSame('Gates open', $this->sent[0]['payload']['title']);
 
         $this->artisan('webpush:scheduled-broadcasts')->assertSuccessful();
+        $this->assertCount(1, $this->sent);
+    }
+
+    public function test_scheduled_broadcast_is_pushed_by_itself_once_due_without_cron(): void
+    {
+        PushSubscription::create(['user_id' => User::factory()->create()->id, 'endpoint' => 'https://push.example.com/a', 'public_key' => 'k', 'auth_token' => 'a']);
+        $broadcast = Broadcast::create(['title' => 'Session moved', 'body' => 'Now at 2pm.', 'status' => 'scheduled', 'scheduled_at' => now()->addMinutes(5)]);
+
+        $this->getJson('/api/events')->assertOk();
+        $this->assertCount(0, $this->sent);
+
+        $this->travel(6)->minutes();
+        Cache::flush();
+        $this->getJson('/api/events')->assertOk();
+
+        $this->assertCount(1, $this->sent);
+        $this->assertSame('Session moved', $this->sent[0]['payload']['title']);
+        $this->assertNotNull($broadcast->fresh()->pushed_at);
+
+        Cache::flush();
+        $this->getJson('/api/events')->assertOk();
         $this->assertCount(1, $this->sent);
     }
 }

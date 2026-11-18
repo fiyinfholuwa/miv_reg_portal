@@ -1,8 +1,8 @@
 'use client';
 
 import { toast } from '../../lib/toast';
-import { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { MivEvent, cardShareUrl, eventPageUrl, fetchPhotoUrl, publishCard, uploadPhoto } from '../../lib/events';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
+import { MivEvent, eventPageUrl, fetchPhotoUrl, uploadPhoto } from '../../lib/events';
 import { renderAttendingCard } from './attending-card';
 
 type Props = {
@@ -81,37 +81,9 @@ export default function AttendingCardStudio({ event, name: initialName, hasSaved
 
   const cardFile = () => cardBlob ? new File([cardBlob], fileName, { type: 'image/png' }) : null;
 
-  /**
-   * The card is uploaded in the background as soon as it is drawn, so the
-   * share link (on this website, never the API server) is ready before the
-   * click. Phones need the share sheet opened straight from the tap, with no
-   * network wait in between, or they refuse it.
-   */
-  const published = useRef<{ blob: Blob; link: Promise<string>; ready: string | null } | null>(null);
-  const prepareLink = useCallback((blob: Blob) => {
-    if (published.current?.blob === blob) return published.current.link;
-    const entry: { blob: Blob; link: Promise<string>; ready: string | null } = { blob, ready: null, link: Promise.resolve('') };
-    entry.link = publishCard(event.slug, blob)
-      .then(({ code }) => { const link = cardShareUrl(event.slug, code); entry.ready = link; return link; })
-      .catch(() => { published.current = null; return eventPageUrl(event.slug); });
-    published.current = entry;
-    return entry.link;
-  }, [event.slug]);
-
-  useEffect(() => {
-    if (!cardBlob) return;
-    const timer = window.setTimeout(() => void prepareLink(cardBlob), 1200);
-    return () => window.clearTimeout(timer);
-  }, [cardBlob, prepareLink]);
-
-  /** The share link right now if ready (keeps the tap valid), otherwise wait for it. */
-  const shareLink = async () => {
-    if (!cardBlob) return eventPageUrl(event.slug);
-    if (published.current?.blob === cardBlob && published.current.ready) return published.current.ready;
-    return prepareLink(cardBlob);
-  };
-  const readyLink = () => (cardBlob && published.current?.blob === cardBlob ? published.current.ready : null);
-  const captionFor = (link: string) => `${captionIntro} Join me 👉 ${link}`;
+  /** Short link that opens the registration form for this event. */
+  const registerLink = `${typeof window === 'undefined' ? '' : window.location.origin}/register/${event.slug}`;
+  const caption = `${captionIntro} Register here 👉 ${registerLink}`;
 
   const download = () => {
     if (!cardUrl) return;
@@ -119,90 +91,37 @@ export default function AttendingCardStudio({ event, name: initialName, hasSaved
     link.href = cardUrl;
     link.download = fileName;
     link.click();
-    toast.success('Card downloaded.');
   };
-
-  const canShareFile = () => {
-    const file = cardFile();
-    return Boolean(file && typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [file] })));
-  };
-
-  /** Opens the phone's share sheet with the card image and the caption + link. */
-  const shareFile = async (link: string) => {
-    const file = cardFile();
-    if (!file) return false;
-    try {
-      await navigator.share({ title: `I will be attending ${event.short_name}`, text: captionFor(link), files: [file] });
-    } catch (shareError) {
-      if (!(shareError instanceof DOMException && shareError.name === 'AbortError')) return false;
-    }
-    return true;
-  };
-
-  const copyText = async (text: string, message: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success(message);
-    } catch {
-      toast.error('Copy is blocked in this browser.');
-    }
-  };
-
-  /** Desktop: put the card image on the clipboard so it can be pasted into the post. */
-  const copyImage = async () => {
-    if (!cardBlob || typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) return false;
-    try {
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': cardBlob })]);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const withSharing = async (action: () => Promise<void>) => {
-    setSharing(true);
-    try { await action(); } finally { setSharing(false); }
-  };
-
-  /** "Share card": image + link through the share sheet, or copy the link. */
-  const shareNative = () => withSharing(async () => {
-    if (canShareFile()) {
-      if (await shareFile(readyLink() ?? await shareLink())) return;
-    }
-    await copyText(captionFor(await shareLink()), 'Card link copied. Paste it anywhere and your card shows as the preview.');
-  });
-
-  const copyCaption = () => withSharing(async () => {
-    await copyText(captionFor(await shareLink()), 'Caption and card link copied.');
-  });
 
   /**
-   * A specific network. Phones: the share sheet with the image and link (pick
-   * the app). Computers: open the network's share page with the link (its
-   * preview is the card) and copy the image so it can be pasted in as well.
+   * Phones (and browsers that support it): the share sheet with the card
+   * image attached and the caption + registration link. Elsewhere: download
+   * the card and copy the caption so both can go into the post.
    */
-  const shareTo = (network: string, build: (link: string) => string) => withSharing(async () => {
-    if (canShareFile()) {
-      if (await shareFile(readyLink() ?? await shareLink())) return;
+  const share = async () => {
+    const file = cardFile();
+    if (!file) return;
+    setSharing(true);
+    try {
+      if (typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+        try {
+          await navigator.share({ title: `I will be attending ${event.short_name}`, text: caption, files: [file] });
+          return;
+        } catch (shareError) {
+          if (shareError instanceof DOMException && shareError.name === 'AbortError') return;
+        }
+      }
+      download();
+      try {
+        await navigator.clipboard.writeText(caption);
+        toast.success('Card downloaded and caption copied. Attach the card and paste the caption in your post.');
+      } catch {
+        toast.success('Card downloaded. Attach it to your post with the registration link.');
+      }
+    } finally {
+      setSharing(false);
     }
-    const popup = window.open('', '_blank');
-    const link = await shareLink();
-    const target = build(link);
-    if (popup) {
-      popup.opener = null;
-      popup.location.href = target;
-    } else {
-      window.location.href = target;
-    }
-    if (await copyImage()) toast.info(`Your card image is copied too. Paste it into the ${network} post if you want the picture attached as well as the link preview.`);
-  });
-
-  const socials: { label: string; share: () => Promise<void> }[] = [
-    { label: 'WhatsApp', share: () => shareTo('WhatsApp', (link) => `https://wa.me/?text=${encodeURIComponent(captionFor(link))}`) },
-    { label: 'Facebook', share: () => shareTo('Facebook', (link) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}&quote=${encodeURIComponent(captionIntro)}`) },
-    { label: 'LinkedIn', share: () => shareTo('LinkedIn', (link) => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}`) },
-    { label: 'X', share: () => shareTo('X', (link) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(captionFor(link))}`) },
-  ];
+  };
 
   return (
     <div className={`grid gap-6 ${compact ? 'sm:grid-cols-[220px_minmax(0,1fr)]' : 'lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]'}`}>
@@ -223,15 +142,11 @@ export default function AttendingCardStudio({ event, name: initialName, hasSaved
           <label className="mt-5 block max-w-md text-sm font-semibold text-[#22262e]">Name on card<input value={name} onChange={(changeEvent) => setName(changeEvent.target.value)} maxLength={60} className="mt-2 w-full rounded-xl border-[1.5px] border-[#c9ced6] bg-white px-4 py-3 outline-none focus:border-[#1460a1]" /></label>
         )}
 
-        <div className="mt-5 flex flex-wrap gap-2">
-          <button type="button" onClick={() => void shareNative()} disabled={!cardBlob || sharing} className="rounded-full bg-[#a82e26] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#8c1f1c] disabled:opacity-50">Share card</button>
-          <button type="button" onClick={download} disabled={!cardUrl} className="rounded-full border-[1.5px] border-[#c9ced6] bg-white px-5 py-3 text-sm font-bold text-[#0c0d10] disabled:opacity-50">Download</button>
+        <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <button type="button" onClick={() => void share()} disabled={!cardBlob || sharing} className="rounded-full bg-[#a82e26] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#8c1f1c] disabled:opacity-50">{sharing ? 'Sharing…' : 'Share'}</button>
+          <button type="button" onClick={() => { download(); toast.success('Card downloaded.'); }} disabled={!cardUrl} className="rounded-full border-[1.5px] border-[#c9ced6] bg-white px-6 py-3 text-sm font-bold text-[#0c0d10] disabled:opacity-50">Download</button>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2" aria-label="Share to social media">
-          {socials.map((social) => <button key={social.label} type="button" onClick={() => void social.share()} disabled={!cardBlob || sharing} className="rounded-full bg-[#dceaf5] px-4 py-2 text-xs font-bold text-[#0c4c8a] hover:bg-[#bcd6ec] disabled:opacity-50">{social.label}</button>)}
-          <button type="button" onClick={() => void copyCaption()} disabled={!cardBlob || sharing} className="rounded-full bg-[#f4eddc] px-4 py-2 text-xs font-bold text-[#22262e] disabled:opacity-50">Copy caption</button>
-        </div>
-        <p className="mt-3 text-xs text-[#6b7280]">{sharing ? 'Preparing your card…' : 'Every share sends your card and your link. On a phone the image itself is attached; on a computer the link shows your card as its preview.'}</p>
+        <p className="mt-3 text-xs text-[#6b7280]">Share sends your card with the link to register for {event.short_name}.</p>
       </div>
     </div>
   );

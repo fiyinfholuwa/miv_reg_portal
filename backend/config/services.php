@@ -16,12 +16,6 @@ return [
         // Emails one address can receive per minute (codes, notifications). Broadcasts are exempt.
         'per_recipient_per_minute' => (int) env('ELASTICEMAIL_PER_RECIPIENT_PER_MINUTE', 2),
     ],
-    'webpush' => [
-        // VAPID keys live in app_settings (Admin → Settings → Push), not .env.
-        // true: pushes go through the queue (run `php artisan queue:work`).
-        // false: they are sent right after the HTTP response, no worker needed.
-        'queue' => (bool) env('WEBPUSH_QUEUE', false),
-    ],
     'paystack' => [
         'public_key' => env('PAYSTACK_PUBLIC_KEY'),
         'secret_key' => env('PAYSTACK_SECRET_KEY'),

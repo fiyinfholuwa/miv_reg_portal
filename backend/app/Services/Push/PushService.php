@@ -9,8 +9,7 @@ use App\Models\User;
 use Illuminate\Support\Str;
 
 /**
- * Saves browser subscriptions and sends pushes, either through the queue or
- * right after the HTTP response (config services.webpush.queue).
+ * Saves browser subscriptions and sends pushes instantly (no queue).
  */
 class PushService
 {
@@ -44,12 +43,31 @@ class PushService
     /** Push a visible broadcast to every subscribed browser, once. */
     public function broadcast(Broadcast $broadcast): void
     {
-        if ($broadcast->pushed_at !== null) {
+        // Claim it in one atomic update so two requests can never both send it.
+        $claimed = Broadcast::query()->whereKey($broadcast->getKey())->whereNull('pushed_at')->update(['pushed_at' => now()]);
+        if ($claimed === 0) {
             return;
         }
 
-        $broadcast->forceFill(['pushed_at' => now()])->save();
+        $broadcast->pushed_at = now();
         $this->dispatch(new SendPushNotification(null, $this->payload($broadcast->title, $broadcast->body, '/dashboard', 'broadcast-'.$broadcast->id)));
+    }
+
+    /**
+     * Push scheduled broadcasts whose time has come. Runs by itself after API
+     * requests (see PushDueBroadcasts middleware), so no cron is needed.
+     */
+    public function pushDueBroadcasts(): int
+    {
+        $due = Broadcast::query()
+            ->where('status', 'scheduled')
+            ->whereNull('pushed_at')
+            ->where('scheduled_at', '<=', now())
+            ->get();
+
+        $due->each(fn (Broadcast $broadcast) => $this->broadcast($broadcast));
+
+        return $due->count();
     }
 
     /**
@@ -60,14 +78,9 @@ class PushService
         return ['title' => $title, 'body' => Str::limit($body, 180), 'url' => $url ?: '/dashboard', 'tag' => $tag];
     }
 
+    /** Sent immediately, in the same request: no queue or worker involved. */
     private function dispatch(SendPushNotification $job): void
     {
-        if (config('services.webpush.queue')) {
-            dispatch($job);
-
-            return;
-        }
-
-        dispatch($job)->afterResponse();
+        dispatch_sync($job);
     }
 }
