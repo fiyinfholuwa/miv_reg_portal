@@ -8,8 +8,8 @@ use App\Http\Requests\ShopCartRequest;
 use App\Http\Requests\ShopOrderRequest;
 use App\Models\PartnerInquiry;
 use App\Models\ShopProduct;
-use App\Services\ShopOrderService;
 use App\Services\ShopCartService;
+use App\Services\ShopOrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,6 +24,7 @@ class ShopController extends Controller
     {
         return response()->json([
             'products' => ShopProduct::query()
+                ->with('event:id,slug,short_name')
                 ->where('active', true)
                 ->orderBy('sort_order')
                 ->latest('id')

@@ -6,8 +6,8 @@ import { api } from './adminApi';
 import { Field, card, input } from './adminUi';
 import { Badge, DataTable, Modal, Pagination, StatusBadge, StatusTabs, TableToolbar, dangerButton, formatDate, primaryButton, secondaryButton, useClientTable, type Column } from './table';
 
-type EventOption = { slug: string; short_name: string };
-type RegistrantEvent = { registration_id: number; slug: string; short_name: string; ticket_code: string; attendance_mode: string | null; team: string | null; checked_in_at: string | null };
+type EventOption = { id?: number; slug: string; short_name: string };
+type RegistrantEvent = { registration_id: number; slug: string; short_name: string; ticket_code: string; attendance_mode: string | null; needs_accommodation?: boolean; team: string | null; checked_in_at: string | null };
 type Registrant = { id: number; name: string; email: string; phone: string | null; role: string | null; church: string | null; state_country: string | null; approval_status: string; verified: boolean; verified_at: string | null; created_at: string | null; events: RegistrantEvent[] };
 type Meta = { page: number; last_page: number; per_page: number; total: number };
 
@@ -16,7 +16,7 @@ const STATUSES = [{ value: '', label: 'All' }, { value: 'pending', label: 'Pendi
 
 export function useEventOptions() {
   const [events, setEvents] = useState<EventOption[]>([]);
-  useEffect(() => { void api('/admin/events').then((data) => setEvents(data.events.map((event: EventOption) => ({ slug: event.slug, short_name: event.short_name })))).catch(() => undefined); }, []);
+  useEffect(() => { void api('/admin/events').then((data) => setEvents(data.events.map((event: EventOption) => ({ id: event.id, slug: event.slug, short_name: event.short_name })))).catch(() => undefined); }, []);
   return events;
 }
 
@@ -26,10 +26,10 @@ function EmailBadge({ verified }: { verified: boolean }) {
   return verified ? <Badge tone="green">✓ Email verified</Badge> : <Badge tone="amber">Email not verified</Badge>;
 }
 
-function RegistrantDetail({ person, onClose, onReview, onResend }: { person: Registrant; onClose: () => void; onReview: (ids: number[], status: string) => Promise<void>; onResend: (person: Registrant) => Promise<void> }) {
+function RegistrantDetail({ person, onClose, onReview, onResend, readOnly = false }: { person: Registrant; onClose: () => void; onReview: (ids: number[], status: string) => Promise<void>; onResend: (person: Registrant) => Promise<void>; readOnly?: boolean }) {
   const [sending, setSending] = useState(false);
   return (
-    <Modal title={person.name} subtitle={person.email} onClose={onClose} size="lg" footer={<>
+    <Modal title={person.name} subtitle={person.email} onClose={onClose} size="lg" footer={readOnly ? undefined : <>
       {person.approval_status !== 'rejected' && <button type="button" onClick={() => void onReview([person.id], 'rejected').then(onClose)} className={dangerButton}>Reject</button>}
       {person.approval_status !== 'approved' && <button type="button" onClick={() => void onReview([person.id], 'approved').then(onClose)} className={primaryButton}>Approve</button>}
     </>}>
@@ -38,19 +38,22 @@ function RegistrantDetail({ person, onClose, onReview, onResend }: { person: Reg
       </dl>
       <div className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl p-3 ${person.verified ? 'bg-[#eef8f1]' : 'bg-[#fff8e6]'}`}>
         <div><EmailBadge verified={person.verified} /><p className="mt-1 text-xs text-ink/60">{person.verified ? `Confirmed ${formatDate(person.verified_at, true)}` : 'They have not entered the code or clicked the link we emailed. They cannot sign in until they do.'}</p></div>
-        {!person.verified && <button type="button" disabled={sending} onClick={() => { setSending(true); void onResend(person).finally(() => setSending(false)); }} className={secondaryButton}>{sending ? 'Sending…' : 'Resend verification email'}</button>}
+        {!person.verified && !readOnly && <button type="button" disabled={sending} onClick={() => { setSending(true); void onResend(person).finally(() => setSending(false)); }} className={secondaryButton}>{sending ? 'Sending…' : 'Resend verification email'}</button>}
       </div>
       <h3 className="mt-5 text-sm font-bold">Events</h3>
       <div className="mt-2 grid gap-2">
         {person.events.length === 0 && <p className="text-sm text-ink/55">Not registered for any event yet.</p>}
-        {person.events.map((event) => <div key={event.registration_id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3 text-sm"><span><strong>{event.short_name}</strong> <span className="font-mono text-xs text-ink/55">{event.ticket_code}</span></span><span className="flex flex-wrap gap-1.5">{event.attendance_mode && <Badge>{event.attendance_mode}</Badge>}{event.team && <Badge tone="blue">{event.team}</Badge>}{event.checked_in_at ? <Badge tone="green">Checked in</Badge> : <Badge>Not checked in</Badge>}</span></div>)}
+        {person.events.map((event) => <div key={event.registration_id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3 text-sm"><span><strong>{event.short_name}</strong> <span className="font-mono text-xs text-ink/55">{event.ticket_code}</span></span><span className="flex flex-wrap gap-1.5">{event.attendance_mode && <Badge>{event.attendance_mode}</Badge>}{event.needs_accommodation && <Badge tone="amber">Needs accommodation</Badge>}{event.team && <Badge tone="blue">{event.team}</Badge>}{event.checked_in_at ? <Badge tone="green">Checked in</Badge> : <Badge>Not checked in</Badge>}</span></div>)}
       </div>
     </Modal>
   );
 }
 
-/** Registrants list; `approvals` mode starts on pending with bulk approve. */
-export function RegistrantsView({ approvals = false }: { approvals?: boolean }) {
+/**
+ * Registrants list. `accommodation` mode is the read-only list for the
+ * accommodation team: only people who asked for a room, no approvals.
+ */
+export function RegistrantsView({ accommodation = false }: { accommodation?: boolean }) {
   const events = useEventOptions();
   const [rows, setRows] = useState<Registrant[]>([]);
   const [meta, setMeta] = useState<Meta>({ page: 1, last_page: 1, per_page: 15, total: 0 });
@@ -58,7 +61,8 @@ export function RegistrantsView({ approvals = false }: { approvals?: boolean }) 
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
-  const [filters, setFilters] = useState<Record<string, string>>({ status: approvals ? 'pending' : '' });
+  const initialFilters: Record<string, string> = accommodation ? { status: '', accommodation: '1' } : { status: '' };
+  const [filters, setFilters] = useState<Record<string, string>>(initialFilters);
   const [range, setRange] = useState({ from: '', to: '' });
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(15);
@@ -97,7 +101,15 @@ export function RegistrantsView({ approvals = false }: { approvals?: boolean }) 
   };
 
   const allSelected = rows.length > 0 && rows.every((row) => selected.includes(row.id));
-  const columns: Column<Registrant>[] = [
+  const roomEvents = (row: Registrant) => row.events.filter((event) => event.needs_accommodation && (!filters.event || event.slug === filters.event));
+  const accommodationColumns: Column<Registrant>[] = [
+    { key: 'name', header: 'Name', cell: (row) => <div className="min-w-0"><strong className="block truncate">{row.name}</strong><span className="block truncate text-xs text-ink/50">{row.email}</span></div> },
+    { key: 'phone', header: 'Phone', cell: (row) => row.phone ? <a href={`tel:${row.phone}`} onClick={(event) => event.stopPropagation()} className="text-[#1469a9]">{row.phone}</a> : <span className="text-ink/40">—</span> },
+    { key: 'from', header: 'From', cell: (row) => <span className="text-ink/70">{row.state_country ?? '—'}</span> },
+    { key: 'events', header: 'Room needed for', cell: (row) => <div className="flex flex-wrap justify-end gap-1 md:justify-start">{roomEvents(row).map((event) => <Badge key={event.registration_id} tone="blue">{event.short_name}</Badge>)}</div> },
+    { key: 'checked', header: 'Arrived', cell: (row) => roomEvents(row).some((event) => event.checked_in_at) ? <Badge tone="green">Checked in</Badge> : <Badge>Not yet</Badge> },
+  ];
+  const columns: Column<Registrant>[] = accommodation ? accommodationColumns : [
     { key: 'select', header: <input type="checkbox" checked={allSelected} onChange={() => setSelected(allSelected ? [] : rows.map((row) => row.id))} aria-label="Select all on this page" className="h-4 w-4" />, cell: (row) => <input type="checkbox" checked={selected.includes(row.id)} onClick={(event) => event.stopPropagation()} onChange={() => setSelected((current) => current.includes(row.id) ? current.filter((id) => id !== row.id) : [...current, row.id])} aria-label={`Select ${row.name}`} className="h-4 w-4" />, className: 'w-10' },
     { key: 'name', header: 'Name', cell: (row) => <div className="min-w-0"><strong className="block truncate">{row.name}</strong><span className="flex items-center gap-1.5 text-xs text-ink/50"><span className="truncate">{row.email}</span>{row.verified ? <span title={`Email verified ${formatDate(row.verified_at)}`} className="shrink-0 font-bold text-[#2f7d4f]">✓</span> : <span title="Email not verified" className="shrink-0 rounded-full bg-[#fff4d9] px-1.5 text-[10px] font-bold text-[#9a6814]">unverified</span>}</span></div> },
     { key: 'role', header: 'Attends as', cell: (row) => <span className="text-ink/70">{row.role ?? '—'}</span> },
@@ -113,27 +125,29 @@ export function RegistrantsView({ approvals = false }: { approvals?: boolean }) 
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <StatusTabs options={STATUSES} value={filters.status ?? ''} onChange={(status) => setFilters((current) => ({ ...current, status }))} counts={counts} />
-        <div className="flex gap-1.5 text-xs font-bold" role="group" aria-label="Email verification">
+        {accommodation
+          ? <p className="text-sm text-ink/60"><strong className="text-ink">{meta.total}</strong> {meta.total === 1 ? 'person needs' : 'people need'} accommodation{filters.event ? ` for ${events.find((event) => event.slug === filters.event)?.short_name ?? 'this event'}` : ''}.</p>
+          : <StatusTabs options={STATUSES} value={filters.status ?? ''} onChange={(status) => setFilters((current) => ({ ...current, status }))} counts={counts} />}
+        <div className={`${accommodation ? 'hidden' : 'flex'} flex-wrap gap-1.5 text-xs font-bold`} role="group" aria-label="Email verification">
           {[{ value: 'yes', label: `✓ ${counts.verified ?? 0} verified`, on: 'bg-[#2f7d4f] text-white', off: 'bg-[#dff2e5] text-[#2f7d4f]' }, { value: 'no', label: `${counts.unverified ?? 0} not verified`, on: 'bg-[#9a6814] text-white', off: 'bg-[#fff4d9] text-[#9a6814]' }].map((chip) => <button key={chip.value} type="button" aria-pressed={filters.verified === chip.value} onClick={() => setFilters((current) => ({ ...current, verified: current.verified === chip.value ? '' : chip.value }))} className={`rounded-full px-3 py-1.5 transition ${filters.verified === chip.value ? chip.on : chip.off}`}>{chip.label}</button>)}
         </div>
       </div>
       <TableToolbar
         query={query} onQuery={setQuery} placeholder="Name, email, phone, church or ticket code"
-        filters={[{ key: 'verified', label: 'Email', options: [{ value: 'yes', label: 'Verified' }, { value: 'no', label: 'Not verified' }] }, { key: 'event', label: 'Event', options: events.map((event) => ({ value: event.slug, label: event.short_name })) }, { key: 'role', label: 'Attends as', options: ROLES.map((role) => ({ value: role, label: role })) }]}
+        filters={[...(accommodation ? [] : [{ key: 'verified', label: 'Email', options: [{ value: 'yes', label: 'Verified' }, { value: 'no', label: 'Not verified' }] }]), { key: 'event', label: 'Event', options: events.map((event) => ({ value: event.slug, label: event.short_name })) }, { key: 'role', label: 'Attends as', options: ROLES.map((role) => ({ value: role, label: role })) }]}
         values={filters} onFilter={(key, value) => setFilters((current) => ({ ...current, [key]: value }))}
         dateRange={range} onDateRange={setRange} dateLabel="Registered"
-        onReset={() => { setQuery(''); setFilters({ status: approvals ? 'pending' : '' }); setRange({ from: '', to: '' }); }}
+        onReset={() => { setQuery(''); setFilters(initialFilters); setRange({ from: '', to: '' }); }}
       />
-      {selected.length > 0 && (
+      {selected.length > 0 && !accommodation && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#03284a] px-4 py-2.5 text-sm text-white">
           <span>{selected.length} selected</span>
           <div className="flex gap-2"><button type="button" onClick={() => void review(selected, 'approved')} className="rounded-full bg-white px-4 py-1.5 text-xs font-bold text-[#03284a]">Approve selected</button><button type="button" onClick={() => void review(selected, 'rejected')} className="rounded-full bg-white/15 px-4 py-1.5 text-xs font-bold">Reject selected</button><button type="button" onClick={() => setSelected([])} className="px-2 text-xs font-bold text-white/70">Clear</button></div>
         </div>
       )}
-      <DataTable columns={columns} rows={rows} rowKey={(row) => row.id} loading={loading && rows.length === 0} onRowClick={setViewing} empty={approvals && !filters.event && !debounced ? 'No one is waiting for approval.' : 'No registrants match.'} />
+      <DataTable columns={columns} rows={rows} rowKey={(row) => row.id} loading={loading && rows.length === 0} onRowClick={setViewing} empty={accommodation ? 'No one has asked for accommodation yet.' : 'No registrants match.'} />
       <Pagination page={meta.page} pages={meta.last_page} total={meta.total} pageSize={meta.per_page} onPage={setPage} onPageSize={setPerPage} />
-      {viewing && <RegistrantDetail person={viewing} onClose={() => setViewing(null)} onReview={review} onResend={resend} />}
+      {viewing && <RegistrantDetail person={viewing} onClose={() => setViewing(null)} onReview={review} onResend={resend} readOnly={accommodation} />}
     </div>
   );
 }

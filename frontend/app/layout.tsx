@@ -5,6 +5,10 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'The Men of Issachar Vision | Conferences, retreats & gatherings',
   description: 'Every MIV conference, retreat and leadership gathering in one place. Find your next event and register.',
+  // Needed for iOS Web Push (Add to Home Screen).
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'MIV Events', statusBarStyle: 'default' },
+  icons: { apple: '/images/miv-logo.png' },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

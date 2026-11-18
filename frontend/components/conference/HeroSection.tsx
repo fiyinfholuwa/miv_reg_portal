@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { Arrow, Countdown, Mark } from './ConferenceAtoms';
 import { images } from './conference-data';
+import { logout, useHasSession } from '../landing/hub-data';
 
 const ConferenceScene = dynamic(
   () => import('../ConferenceScene').then((module) => module.ConferenceScene),
@@ -12,6 +13,7 @@ const ConferenceScene = dynamic(
 
 export default function HeroSection() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const hasSession = useHasSession();
 
   const closeMenu = () => setIsMenuOpen(false);
 
@@ -23,7 +25,7 @@ export default function HeroSection() {
 
       <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-ink/90 py-3 text-white shadow-lg backdrop-blur-md sm:py-4">
         <div className="container-shell flex items-center justify-between">
-          <a href="#top" className="flex items-center gap-3" aria-label="Jan Conf home"><Mark /><span className="font-display text-xl uppercase leading-none tracking-wide">Jan Conf<br /><span className="text-coral">2027</span></span></a>
+          <a href="#top" className="flex items-center gap-3" aria-label="Jan Conf home"><Mark /><span className="font-display text-lg uppercase leading-none tracking-wide sm:text-xl">Jan Conf<br /><span className="text-coral">2027</span></span></a>
           <nav className="hidden items-center gap-8 text-sm font-semibold text-white/80 lg:flex" aria-label="Main navigation">
           <a className="transition hover:text-white" href="#about">About</a>
           <a className="transition hover:text-white" href="#speakers">Speakers</a>
@@ -34,7 +36,12 @@ export default function HeroSection() {
           </nav>
           <div className="flex items-center gap-2">
             <button type="button" className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-white/10 text-xl transition hover:bg-white/20 lg:hidden" onClick={() => setIsMenuOpen((open) => !open)} aria-expanded={isMenuOpen} aria-controls="mobile-navigation" aria-label={isMenuOpen ? 'Close navigation' : 'Open navigation'}>{isMenuOpen ? '×' : '☰'}</button>
-            <a className="button-primary px-4 py-3 sm:px-6" href="#register">Register free <Arrow /></a>
+            {hasSession ? (
+              <>
+                <a className="button-primary px-4 py-3 sm:px-6" href="/dashboard">My dashboard <Arrow /></a>
+                <button type="button" onClick={() => void logout()} className="hidden rounded-full border border-white/25 px-5 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:bg-white/10 lg:inline-flex">Log out</button>
+              </>
+            ) : <a className="button-primary px-4 py-3 sm:px-6" href="#register">Register free <Arrow /></a>}
           </div>
         </div>
         {isMenuOpen && <nav id="mobile-navigation" className="absolute left-4 right-4 top-full mt-3 rounded-2xl border border-white/10 bg-ink p-3 shadow-2xl lg:hidden" aria-label="Mobile navigation">
@@ -44,6 +51,7 @@ export default function HeroSection() {
           <a onClick={closeMenu} className="block rounded-xl px-4 py-3 text-sm font-semibold transition hover:bg-white/10" href="#venue">Venue</a>
           <a onClick={closeMenu} className="block rounded-xl px-4 py-3 text-sm font-semibold transition hover:bg-white/10" href="#media">Media</a>
           <a onClick={closeMenu} className="block rounded-xl px-4 py-3 text-sm font-semibold transition hover:bg-white/10" href="/shop">Shop</a>
+          {hasSession && <button type="button" onClick={() => { closeMenu(); void logout(); }} className="mt-1 block w-full rounded-xl border-t border-white/10 px-4 py-3 text-left text-sm font-semibold text-[#ff9a8d] transition hover:bg-white/10">Log out</button>}
         </nav>}
       </header>
 

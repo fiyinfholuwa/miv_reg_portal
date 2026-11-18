@@ -8,7 +8,7 @@ export function StatsSection() {
 export function AboutSection() {
   return (
     <section id="about" className="container-shell grid gap-12 py-20 sm:py-24 lg:grid-cols-[.85fr_1.15fr] lg:py-32">
-      <div><p className="eyebrow mb-5">Why you should join</p><h2 className="section-title max-w-lg">The biggest <span className="text-coral">conference</span> of the year.</h2><p className="mt-8 max-w-md text-base leading-7 text-ink/65 sm:text-lg sm:leading-8">MIV brings leaders together to think clearly, worship deeply, and leave with a practical mandate for the year ahead.</p><a className="mt-8 inline-flex items-center gap-2 font-bold text-coral" href="#register">Make room for it <Arrow /></a></div>
+      <div><p className="eyebrow mb-5">Why you should join</p><h2 className="section-title max-w-lg">The biggest <span className="text-coral">conference</span> of the year.</h2><p className="mt-8 max-w-md text-base leading-7 text-ink/65 sm:text-lg sm:leading-8">MIV brings leaders together to think clearly, worship deeply, and leave with a practical mandate for the year ahead.</p><a className="mt-8 inline-flex min-h-10 items-center gap-2 font-bold text-coral" href="#register">Make room for it <Arrow /></a></div>
       <div className="grid gap-4 sm:grid-cols-2"><ImageCard src={images.crowd} label="A room full of possibility" className="sm:mt-16" /><ImageCard src={images.speaker} label="Voices that sharpen vision" /><ImageCard src={images.worship} label="Moments that stay with you" className="sm:col-span-2 sm:mx-16" /></div>
     </section>
   );

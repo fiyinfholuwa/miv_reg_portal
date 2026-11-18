@@ -9,7 +9,7 @@ import { Badge, DataTable, Modal, Pagination, StatusBadge, StatusTabs, TableTool
 
 const MEALS = ['Breakfast', 'Lunch', 'Dinner'] as const;
 
-/* --------------------------------------------------------- Check-in & meals */
+/* --------------------------------------------------------- Check-in / meals */
 
 type DeskRegistration = {
   id: number; ticket_code: string; name: string; email: string; phone: string | null; role: string | null; church: string | null; approval_status: string;
@@ -21,13 +21,15 @@ type DeskStats = { date: string; registered: number; checked_in: number; checked
 const time = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit', timeZone: 'Africa/Lagos' }) : '';
 
 /**
- * Welcome desk and meal points. A QR scanner types the ticket code and
- * presses Enter, so the code box stays focused and ready for the next scan.
+ * Welcome desk (`desk="check-in"`) or a meal point (`desk="meals"`). A QR
+ * scanner types the ticket code and presses Enter, so the code box stays
+ * focused and ready for the next scan.
  */
-export function CheckInView() {
+export function CheckInView({ desk = 'check-in' }: { desk?: 'check-in' | 'meals' }) {
+  const isMeals = desk === 'meals';
   const events = useEventOptions();
   const [eventSlug, setEventSlug] = useState('');
-  const [mode, setMode] = useState<'checkin' | (typeof MEALS)[number]>('checkin');
+  const [mode, setMode] = useState<'checkin' | (typeof MEALS)[number]>(isMeals ? MEALS[0] : 'checkin');
   const [autoAction, setAutoAction] = useState(true);
   const [code, setCode] = useState('');
   const [current, setCurrent] = useState<DeskRegistration | null>(null);
@@ -81,11 +83,14 @@ export function CheckInView() {
     try { const data = await api(`/admin/check-in/${current.id}`, { method: 'DELETE' }); setCurrent(data.registration); toast.info(data.message); void loadStats(); } catch (error) { toast.error(errorMessage(error, 'Could not undo.')); }
   };
 
+  const recent = (stats?.recent ?? []).filter((item) => (item.type === 'Check-in') !== isMeals);
+
   return (
     <div className="grid gap-5">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <div className={card}><span className="text-xs font-bold uppercase tracking-[.1em] text-ink/45">Checked in</span><strong className="mt-1 block text-3xl">{stats?.checked_in ?? '—'}<span className="text-base font-semibold text-ink/40"> / {stats?.registered ?? '—'}</span></strong><span className="text-xs text-ink/50">{stats?.checked_in_today ?? 0} today</span></div>
-        {MEALS.map((meal) => <div key={meal} className={card}><span className="text-xs font-bold uppercase tracking-[.1em] text-ink/45">{meal} today</span><strong className="mt-1 block text-3xl">{stats?.meals_today[meal] ?? 0}</strong></div>)}
+      <div className={`grid grid-cols-2 gap-3 ${isMeals ? 'xl:grid-cols-4' : 'xl:grid-cols-3'}`}>
+        <div className={`${card} ${isMeals ? 'hidden' : ''}`}><span className="text-xs font-bold uppercase tracking-[.1em] text-ink/45">Checked in</span><strong className="mt-1 block text-3xl">{stats?.checked_in ?? '—'}<span className="text-base font-semibold text-ink/40"> / {stats?.registered ?? '—'}</span></strong><span className="text-xs text-ink/50">{stats?.checked_in_today ?? 0} today</span></div>
+        {!isMeals && <div className={card}><span className="text-xs font-bold uppercase tracking-[.1em] text-ink/45">Still to arrive</span><strong className="mt-1 block text-3xl">{stats ? Math.max(0, stats.registered - stats.checked_in) : '—'}</strong></div>}
+        {isMeals && MEALS.map((meal) => <div key={meal} className={`${card} ${meal === mode ? 'ring-2 ring-[#1469a9]' : ''}`}><span className="text-xs font-bold uppercase tracking-[.1em] text-ink/45">{meal} today</span><strong className="mt-1 block text-3xl">{stats?.meals_today[meal] ?? 0}</strong></div>)}
         <div className={card}><span className="text-xs font-bold uppercase tracking-[.1em] text-ink/45">Desk date</span><strong className="mt-1 block text-lg">{stats ? new Date(`${stats.date}T12:00:00Z`).toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' }) : '—'}</strong><span className="text-xs text-ink/50">Lagos time · refreshes every 30s</span></div>
       </div>
 
@@ -93,7 +98,9 @@ export function CheckInView() {
         <section className={`${card} grid content-start gap-4 transition ${flash === 'ok' ? 'ring-4 ring-[#2f7d4f]/40' : flash === 'error' ? 'ring-4 ring-coral/40' : ''}`}>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field title="Event"><select value={eventSlug} onChange={(event) => setEventSlug(event.target.value)} className={input}>{events.map((event) => <option key={event.slug} value={event.slug}>{event.short_name}</option>)}</select></Field>
-            <Field title="This desk is for"><select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)} className={input}><option value="checkin">Welcome desk (check-in)</option>{MEALS.map((meal) => <option key={meal} value={meal}>{meal} point</option>)}</select></Field>
+            {isMeals
+              ? <Field title="Serving"><select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)} className={input}>{MEALS.map((meal) => <option key={meal} value={meal}>{meal}</option>)}</select></Field>
+              : <div className="grid content-end"><span className="rounded-xl bg-[#e7f1fa] px-4 py-3 text-sm font-bold text-[#0b4779]">Welcome desk · check-in</span></div>}
           </div>
           <form onSubmit={lookup} className="flex gap-2">
             <input ref={codeInput} autoFocus value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} className="h-14 min-w-0 flex-1 rounded-2xl border-2 border-[#03284a]/20 bg-white px-4 font-mono text-lg font-bold tracking-[.08em] outline-none focus:border-[#1469a9]" placeholder="Scan or type ticket code" aria-label="Ticket code" autoComplete="off" />
@@ -114,11 +121,11 @@ export function CheckInView() {
                 {current.needs_accommodation && <Badge tone="blue">Needs accommodation</Badge>}
                 {current.attendance_days.length > 0 && <Badge>{current.attendance_days.join(', ')}</Badge>}
               </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-4">
-                <button type="button" disabled={busy || Boolean(current.checked_in_at)} onClick={() => void act(current, 'checkin')} className={`${primaryButton} sm:col-span-1`}>{current.checked_in_at ? '✓ In' : 'Check in'}</button>
-                {MEALS.map((meal) => <button key={meal} type="button" disabled={busy || Boolean(current.meals_today[meal])} onClick={() => void act(current, meal)} className={current.meals_today[meal] ? 'rounded-full bg-[#dff2e5] px-3 py-2.5 text-sm font-bold text-[#2f7d4f]' : secondaryButton}>{current.meals_today[meal] ? `✓ ${meal} ${time(current.meals_today[meal])}` : `Serve ${meal}`}</button>)}
+              <div className={`mt-4 grid gap-2 ${isMeals ? 'sm:grid-cols-3' : ''}`}>
+                {!isMeals && <button type="button" disabled={busy || Boolean(current.checked_in_at)} onClick={() => void act(current, 'checkin')} className={primaryButton}>{current.checked_in_at ? `✓ Checked in ${time(current.checked_in_at)}` : 'Check in'}</button>}
+                {isMeals && MEALS.map((meal) => <button key={meal} type="button" disabled={busy || Boolean(current.meals_today[meal])} onClick={() => void act(current, meal)} className={current.meals_today[meal] ? 'rounded-full bg-[#dff2e5] px-3 py-2.5 text-sm font-bold text-[#2f7d4f]' : secondaryButton}>{current.meals_today[meal] ? `✓ ${meal} ${time(current.meals_today[meal])}` : `Serve ${meal}`}</button>)}
               </div>
-              {current.checked_in_at && <button type="button" onClick={() => void undo()} className="mt-3 text-xs font-bold text-coral">Undo check-in</button>}
+              {!isMeals && current.checked_in_at && <button type="button" onClick={() => void undo()} className="mt-3 text-xs font-bold text-coral">Undo check-in</button>}
             </div>
           ) : <p className="rounded-2xl border-2 border-dashed border-ink/10 p-6 text-center text-sm text-ink/50">Scan the ticket QR code from the delegate’s pass (My pass on their dashboard).</p>}
         </section>
@@ -126,8 +133,8 @@ export function CheckInView() {
         <section className={card}>
           <h3 className="text-sm font-bold">Latest activity</h3>
           <ul className="m-0 mt-3 grid list-none gap-1.5 p-0">
-            {(stats?.recent.length ?? 0) === 0 && <li className="text-sm text-ink/50">No scans yet today.</li>}
-            {stats?.recent.map((item, index) => <li key={`${item.at}-${index}`} className="flex items-center gap-3 rounded-xl bg-[#fafaf8] px-3 py-2 text-sm"><Badge tone={item.type === 'Check-in' ? 'navy' : 'green'}>{item.type}</Badge><span className="min-w-0 flex-1 truncate font-semibold">{item.name}</span><span className="shrink-0 text-xs text-ink/50">{time(item.at)}</span></li>)}
+            {recent.length === 0 && <li className="text-sm text-ink/50">No scans yet today.</li>}
+            {recent.map((item, index) => <li key={`${item.at}-${index}`} className="flex items-center gap-3 rounded-xl bg-[#fafaf8] px-3 py-2 text-sm"><Badge tone={item.type === 'Check-in' ? 'navy' : 'green'}>{item.type}</Badge><span className="min-w-0 flex-1 truncate font-semibold">{item.name}</span><span className="shrink-0 text-xs text-ink/50">{time(item.at)}</span></li>)}
           </ul>
         </section>
       </div>

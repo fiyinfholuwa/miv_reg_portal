@@ -5,6 +5,7 @@ import { STANDARD_SIZES, variantLabel } from '../../lib/shop';
 import { errorMessage, toast } from '../../lib/toast';
 import { api } from './adminApi';
 import { Field, ImageInput, card, input } from './adminUi';
+import { useEventOptions } from './PeopleViews';
 import { Badge, DataTable, Modal, Pagination, StatusTabs, TableToolbar, downloadCsv, formatDate, primaryButton, secondaryButton, useClientTable, type Column } from './table';
 
 const naira = (value: number) => `₦${value.toLocaleString('en-NG')}`;
@@ -12,10 +13,11 @@ const naira = (value: number) => `₦${value.toLocaleString('en-NG')}`;
 /* ------------------------------------------------------------ Products */
 
 type Color = { name: string; hex: string; image?: string | null };
-type Product = { id: number; name: string; description: string | null; price: number; image: string | null; tag: string | null; colors: Color[] | null; sizes: string[] | null; stock: number | null; active: boolean; sort_order: number; created_at?: string | null };
+type ProductEvent = { slug: string; short_name: string } | null;
+type Product = { id: number; event_id?: number | null; event?: ProductEvent; name: string; description: string | null; price: number; image: string | null; tag: string | null; colors: Color[] | null; sizes: string[] | null; stock: number | null; active: boolean; sort_order: number; created_at?: string | null };
 
-function ProductForm({ product, onClose, onSaved }: { product: Product | null; onClose: () => void; onSaved: () => Promise<void> }) {
-  const [form, setForm] = useState({ name: product?.name ?? '', description: product?.description ?? '', price: product ? String(product.price) : '', image: product?.image ?? '', tag: product?.tag ?? '', stock: product?.stock == null ? '' : String(product.stock), active: product?.active ?? true, sort_order: String(product?.sort_order ?? 0) });
+function ProductForm({ product, events, onClose, onSaved }: { product: Product | null; events: ReturnType<typeof useEventOptions>; onClose: () => void; onSaved: () => Promise<void> }) {
+  const [form, setForm] = useState({ event_id: product?.event_id ? String(product.event_id) : '', name: product?.name ?? '', description: product?.description ?? '', price: product ? String(product.price) : '', image: product?.image ?? '', tag: product?.tag ?? '', stock: product?.stock == null ? '' : String(product.stock), active: product?.active ?? true, sort_order: String(product?.sort_order ?? 0) });
   const [colors, setColors] = useState<{ name: string; hex: string; image: string }[]>((product?.colors ?? []).map((color) => ({ name: color.name, hex: color.hex, image: color.image ?? '' })));
   const [sizes, setSizes] = useState<string[]>(product?.sizes ?? []);
   const [customSize, setCustomSize] = useState('');
@@ -28,7 +30,7 @@ function ProductForm({ product, onClose, onSaved }: { product: Product | null; o
     setSaving(true);
     try {
       const cleanColors = colors.filter((color) => color.name.trim()).map((color) => ({ name: color.name.trim(), hex: color.hex, image: color.image.trim() || null }));
-      const payload = { ...form, price: Number(form.price), stock: form.stock === '' ? null : Number(form.stock), sort_order: Number(form.sort_order), image: form.image || null, tag: form.tag || null, colors: cleanColors.length ? cleanColors : null, sizes: sizes.length ? sizes : null };
+      const payload = { ...form, event_id: form.event_id ? Number(form.event_id) : null, price: Number(form.price), stock: form.stock === '' ? null : Number(form.stock), sort_order: Number(form.sort_order), image: form.image || null, tag: form.tag || null, colors: cleanColors.length ? cleanColors : null, sizes: sizes.length ? sizes : null };
       await api(product ? `/admin/shop/products/${product.id}` : '/admin/shop/products', { method: product ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
       toast.success(product ? `${form.name} saved.` : `${form.name} added to the shop.`);
       await onSaved();
@@ -50,6 +52,7 @@ function ProductForm({ product, onClose, onSaved }: { product: Product | null; o
             <Field title="Price (₦)"><input required type="number" min="0" value={form.price} onChange={(event) => set('price', event.target.value)} className={input} /></Field>
             <Field title="Stock (blank = unlimited)"><input type="number" min="0" value={form.stock} onChange={(event) => set('stock', event.target.value)} className={input} /></Field>
             <Field title="Tag"><input value={form.tag} onChange={(event) => set('tag', event.target.value)} className={input} placeholder="New, Limited set…" /></Field>
+            <Field title="Event (optional)" className="sm:col-span-2"><select value={form.event_id} onChange={(event) => set('event_id', event.target.value)} className={input}><option value="">General merch (all events)</option>{events.filter((event) => event.id).map((event) => <option key={event.slug} value={String(event.id)}>{event.short_name}</option>)}</select></Field>
             <Field title="Order"><input type="number" min="0" value={form.sort_order} onChange={(event) => set('sort_order', event.target.value)} className={input} /></Field>
           </div>
           <div className="rounded-2xl bg-white p-4">
@@ -71,6 +74,7 @@ function ProductForm({ product, onClose, onSaved }: { product: Product | null; o
 }
 
 export function ShopProductsView() {
+  const events = useEventOptions();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | 'new' | null>(null);
@@ -80,7 +84,7 @@ export function ShopProductsView() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const table = useClientTable(products, { search: (product) => `${product.name} ${product.tag ?? ''} ${product.description ?? ''}`, filters: { visibility: (product, value) => (value === 'visible') === product.active, stock: (product, value) => value === 'out' ? product.stock === 0 : value === 'low' ? product.stock !== null && product.stock > 0 && product.stock <= 10 : true } });
+  const table = useClientTable(products, { search: (product) => `${product.name} ${product.tag ?? ''} ${product.description ?? ''}`, filters: { event: (product, value) => value === 'general' ? !product.event : product.event?.slug === value, visibility: (product, value) => (value === 'visible') === product.active, stock: (product, value) => value === 'out' ? product.stock === 0 : value === 'low' ? product.stock !== null && product.stock > 0 && product.stock <= 10 : true } });
 
   const toggle = async (product: Product) => {
     try { await api(`/admin/shop/products/${product.id}`, { method: 'PATCH', body: JSON.stringify({ ...product, active: !product.active }) }); toast.success(product.active ? `${product.name} hidden.` : `${product.name} is visible.`); await load(); } catch (error) { toast.error(errorMessage(error, 'Could not update the product.')); }
@@ -91,7 +95,7 @@ export function ShopProductsView() {
   };
 
   const columns: Column<Product>[] = [
-    { key: 'product', header: 'Product', cell: (product) => <div className="flex min-w-0 items-center gap-3"><img src={product.image || '/images/miv-logo.png'} alt="" className="h-11 w-11 shrink-0 rounded-lg bg-[#f6f2e9] object-cover" /><span className="min-w-0"><strong className="block truncate">{product.name}</strong>{product.tag && <span className="text-xs text-ink/50">{product.tag}</span>}</span></div> },
+    { key: 'product', header: 'Product', cell: (product) => <div className="flex min-w-0 items-center gap-3"><img src={product.image || '/images/miv-logo.png'} alt="" className="h-11 w-11 shrink-0 rounded-lg bg-[#f6f2e9] object-cover" /><span className="min-w-0"><strong className="block truncate">{product.name}</strong><span className="block truncate text-xs text-ink/50">{[product.event?.short_name, product.tag].filter(Boolean).join(' · ')}</span></span></div> },
     { key: 'price', header: 'Price', cell: (product) => <strong>{naira(product.price)}</strong> },
     { key: 'options', header: 'Options', cell: (product) => <div className="flex flex-wrap items-center justify-end gap-1 md:justify-start">{(product.colors ?? []).map((color) => <span key={color.name} title={color.name} className="h-4 w-4 rounded-full ring-1 ring-inset ring-black/10" style={{ background: color.hex }} />)}{(product.sizes?.length ?? 0) > 0 && <span className="text-xs text-ink/55">{product.sizes?.join(' ')}</span>}{!product.colors?.length && !product.sizes?.length && <span className="text-xs text-ink/40">—</span>}</div> },
     { key: 'stock', header: 'Stock', cell: (product) => product.stock === null ? <span className="text-ink/50">Unlimited</span> : product.stock === 0 ? <Badge tone="red">Sold out</Badge> : product.stock <= 10 ? <Badge tone="amber">{product.stock} left</Badge> : <span>{product.stock}</span> },
@@ -101,10 +105,10 @@ export function ShopProductsView() {
 
   return (
     <div className="grid gap-4">
-      <TableToolbar query={table.query} onQuery={table.setQuery} placeholder="Search products" filters={[{ key: 'visibility', label: 'Visibility', options: [{ value: 'visible', label: 'Visible' }, { value: 'hidden', label: 'Hidden' }] }, { key: 'stock', label: 'Stock', options: [{ value: 'low', label: '10 or fewer left' }, { value: 'out', label: 'Sold out' }] }]} values={table.values} onFilter={table.setFilter} onReset={table.reset} actions={<button type="button" onClick={() => setEditing('new')} className={primaryButton}>+ New product</button>} />
+      <TableToolbar query={table.query} onQuery={table.setQuery} placeholder="Search products" filters={[{ key: 'event', label: 'Event', options: [{ value: 'general', label: 'General merch' }, ...events.map((event) => ({ value: event.slug, label: event.short_name }))] }, { key: 'visibility', label: 'Visibility', options: [{ value: 'visible', label: 'Visible' }, { value: 'hidden', label: 'Hidden' }] }, { key: 'stock', label: 'Stock', options: [{ value: 'low', label: '10 or fewer left' }, { value: 'out', label: 'Sold out' }] }]} values={table.values} onFilter={table.setFilter} onReset={table.reset} actions={<button type="button" onClick={() => setEditing('new')} className={primaryButton}>+ New product</button>} />
       <DataTable columns={columns} rows={table.shown} rowKey={(product) => product.id} loading={loading} onRowClick={setEditing} empty="No products yet." />
       <Pagination page={table.page} pages={table.pages} total={table.total} pageSize={table.pageSize} onPage={table.setPage} onPageSize={table.setPageSize} />
-      {editing && <ProductForm product={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={load} />}
+      {editing && <ProductForm product={editing === 'new' ? null : editing} events={events} onClose={() => setEditing(null)} onSaved={load} />}
     </div>
   );
 }
@@ -115,12 +119,14 @@ type Order = {
   id: number; reference: string; status: string; total: number; pickup_code: string | null; paid_at: string | null; collected_at: string | null; created_at: string | null;
   items: { name: string; color?: string | null; size?: string | null; quantity: number; line_total: number }[];
   user: { name: string | null; email: string | null };
+  events?: { slug: string; short_name: string }[];
 };
 
 const orderState = (order: Order) => order.collected_at ? 'collected' : order.status;
 const itemText = (item: Order['items'][number]) => `${item.name}${variantLabel(item) ? ` (${variantLabel(item)})` : ''} × ${item.quantity}`;
 
 export function AdminOrdersView() {
+  const events = useEventOptions();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewing, setViewing] = useState<Order | null>(null);
@@ -133,7 +139,7 @@ export function AdminOrdersView() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const table = useClientTable(orders, { search: (order) => [order.reference, order.pickup_code, order.user.name, order.user.email, ...order.items.map((item) => item.name)].join(' '), filters: { state: (order, value) => orderState(order) === value, product: (order, value) => order.items.some((item) => item.name === value) }, date: (order) => order.created_at, pageSize: 15 });
+  const table = useClientTable(orders, { search: (order) => [order.reference, order.pickup_code, order.user.name, order.user.email, ...order.items.map((item) => item.name)].join(' '), filters: { state: (order, value) => orderState(order) === value, event: (order, value) => value === 'general' ? !(order.events?.length) : Boolean(order.events?.some((event) => event.slug === value)), product: (order, value) => order.items.some((item) => item.name === value) }, date: (order) => order.created_at, pageSize: 15 });
   const counts = orders.reduce<Record<string, number>>((result, order) => ({ ...result, [orderState(order)]: (result[orderState(order)] ?? 0) + 1 }), { '': orders.length });
   const paid = orders.filter((order) => order.status === 'paid');
   const products = [...new Set(orders.flatMap((order) => order.items.map((item) => item.name)))];
@@ -187,7 +193,7 @@ export function AdminOrdersView() {
       <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="grid content-start gap-4">
           <StatusTabs options={[{ value: '', label: 'All' }, { value: 'paid', label: 'To collect' }, { value: 'collected', label: 'Collected' }, { value: 'pending', label: 'Pending payment' }, { value: 'failed', label: 'Failed' }]} value={table.values.state ?? ''} onChange={(value) => table.setFilter('state', value)} counts={counts} />
-          <TableToolbar query={table.query} onQuery={table.setQuery} placeholder="Pickup code, reference, name, email or product" filters={[{ key: 'product', label: 'Product', options: products.map((name) => ({ value: name, label: name })) }]} values={table.values} onFilter={table.setFilter} dateRange={table.range} onDateRange={table.setRange} dateLabel="Ordered" onReset={table.reset} actions={<button type="button" onClick={exportCsv} disabled={table.total === 0} className={secondaryButton}>Export CSV</button>} />
+          <TableToolbar query={table.query} onQuery={table.setQuery} placeholder="Pickup code, reference, name, email or product" filters={[{ key: 'event', label: 'Event', options: [{ value: 'general', label: 'General merch only' }, ...events.map((event) => ({ value: event.slug, label: event.short_name }))] }, { key: 'product', label: 'Product', options: products.map((name) => ({ value: name, label: name })) }]} values={table.values} onFilter={table.setFilter} dateRange={table.range} onDateRange={table.setRange} dateLabel="Ordered" onReset={table.reset} actions={<button type="button" onClick={exportCsv} disabled={table.total === 0} className={secondaryButton}>Export CSV</button>} />
           <DataTable columns={columns} rows={table.shown} rowKey={(order) => order.id} loading={loading} onRowClick={setViewing} empty="No orders match." />
           <Pagination page={table.page} pages={table.pages} total={table.total} pageSize={table.pageSize} onPage={table.setPage} onPageSize={table.setPageSize} />
         </div>

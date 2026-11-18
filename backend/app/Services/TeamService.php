@@ -121,6 +121,14 @@ class TeamService
         }
 
         EventRegistration::query()->whereIn('id', $registrations->pluck('id'))->update(['team_id' => $team->id]);
+        $team->loadMissing('event');
+        $registrations->where('team_id', '!=', $team->id)->load('user')->each(fn (EventRegistration $registration) => app(NotificationService::class)->notify(
+            $registration->user,
+            'team',
+            "You were added to {$team->name}",
+            "The committee placed you in {$team->name} for {$team->event?->short_name}.",
+            '/dashboard/events/'.$team->event?->slug.'/team',
+        ));
 
         return ['message' => $registrations->count() === 1 ? 'Added to the team.' : "{$registrations->count()} people added to the team."];
     }
@@ -134,6 +142,14 @@ class TeamService
             throw ValidationException::withMessages(['registration' => ['That person is not in this team.']]);
         }
         $registration->update(['team_id' => null]);
+        $team->loadMissing('event');
+        app(NotificationService::class)->notify(
+            $registration->user,
+            'team',
+            "You were removed from {$team->name}",
+            'Ask the committee or your team leader if this looks wrong.',
+            '/dashboard/events/'.$team->event?->slug.'/team',
+        );
 
         return ['message' => 'Removed from the team.'];
     }

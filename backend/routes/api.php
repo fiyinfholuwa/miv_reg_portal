@@ -5,7 +5,9 @@ use App\Http\Controllers\Api\AdminOperationsController;
 use App\Http\Controllers\Api\AttendingCardController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfilePhotoController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\ShopController;
 use App\Http\Controllers\Api\SiteContentController;
@@ -27,6 +29,10 @@ Route::prefix('auth')->group(function (): void {
         Route::post('/testimonials', [DashboardController::class, 'submitTestimonial']);
         Route::post('/feedback', [DashboardController::class, 'submitFeedback']);
         Route::get('/broadcasts', [DashboardController::class, 'broadcasts']);
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::post('/notifications/read', [NotificationController::class, 'markRead']);
+        Route::post('/push-subscriptions', [PushSubscriptionController::class, 'store']);
+        Route::delete('/push-subscriptions', [PushSubscriptionController::class, 'destroy']);
         Route::get('/events', [EventController::class, 'myEvents']);
         Route::get('/photo', [ProfilePhotoController::class, 'show']);
         Route::post('/photo', [ProfilePhotoController::class, 'store']);
@@ -62,9 +68,13 @@ Route::prefix('admin')->group(function (): void {
         Route::put('/account', [AdminOperationsController::class, 'updateAccount']);
         Route::get('/settings/paystack', [AdminOperationsController::class, 'paystackSettings']);
         Route::put('/settings/paystack', [AdminOperationsController::class, 'updatePaystackSettings']);
+        Route::get('/settings/push', [AdminOperationsController::class, 'pushSettings']);
+        Route::put('/settings/push', [AdminOperationsController::class, 'updatePushSettings']);
+        Route::post('/settings/push/regenerate', [AdminOperationsController::class, 'regeneratePushKeys']);
         Route::put('/account/password', [AdminOperationsController::class, 'updatePassword']);
         Route::post('/account/sign-out-others', [AdminOperationsController::class, 'signOutOthers']);
         Route::post('/admins', [AdminOperationsController::class, 'createAdmin']);
+        Route::patch('/admins/{admin}', [AdminOperationsController::class, 'updateAdmin']);
         Route::delete('/admins/{admin}', [AdminOperationsController::class, 'removeAdmin']);
         Route::patch('/registrants/{registrant}/review', [AdminController::class, 'reviewRegistrant']);
         Route::get('/testimonials', [AdminController::class, 'testimonials']);
@@ -90,6 +100,7 @@ Route::prefix('admin')->group(function (): void {
 });
 
 Route::get('/user', [RegistrationController::class, 'user'])->middleware('auth:sanctum');
+Route::get('/push/public-key', [PushSubscriptionController::class, 'publicKey']);
 Route::get('/events', [EventController::class, 'index']);
 Route::get('/events/{event}', [EventController::class, 'show']);
 Route::get('/share/{event}/{code}', [AttendingCardController::class, 'show'])->where('code', '[a-f0-9]{24}');

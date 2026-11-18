@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\AdminPermissions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -22,6 +23,7 @@ class AdminAccountService
             'name' => $admin->name,
             'email' => $admin->email,
             'phone' => $admin->phone,
+            'permissions' => $admin->admin_permissions,
             'sessions' => $admin->tokens()->count(),
             'created_at' => $admin->created_at?->toIso8601String(),
         ];
@@ -67,16 +69,11 @@ class AdminAccountService
      */
     public function admins(): array
     {
-        return User::where('is_admin', true)->orderBy('name')->get()->map(fn (User $user): array => [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'created_at' => $user->created_at?->toIso8601String(),
-        ])->all();
+        return User::where('is_admin', true)->orderBy('name')->get()->map(fn (User $user): array => $this->adminPayload($user))->all();
     }
 
     /**
-     * @param  array{name: string, email: string, password: string}  $attributes
+     * @param  array{name: string, email: string, password: string, permissions?: list<string>|null}  $attributes
      * @return array<string, mixed>
      */
     public function createAdmin(array $attributes): array
@@ -86,9 +83,47 @@ class AdminAccountService
             'email' => Str::lower(trim($attributes['email'])),
             'password' => Hash::make($attributes['password']),
         ]);
-        $user->forceFill(['is_admin' => true, 'email_verified_at' => now(), 'role' => 'Admin', 'approval_status' => 'approved'])->save();
+        $user->forceFill([
+            'is_admin' => true,
+            'admin_permissions' => AdminPermissions::normalise($attributes['permissions'] ?? null),
+            'email_verified_at' => now(),
+            'role' => 'Admin',
+            'approval_status' => 'approved',
+        ])->save();
 
-        return ['message' => "{$user->name} can now sign in to admin.", 'admin' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'created_at' => $user->created_at?->toIso8601String()]];
+        return ['message' => "{$user->name} can now sign in to admin.", 'admin' => $this->adminPayload($user)];
+    }
+
+    /**
+     * @param  list<string>|null  $permissions  Null gives full access.
+     * @return array<string, mixed>
+     */
+    public function updatePermissions(User $current, User $admin, ?array $permissions): array
+    {
+        if (! $admin->is_admin) {
+            throw ValidationException::withMessages(['admin' => ['That account is not an admin.']]);
+        }
+        if ($current->is($admin) && $permissions !== null) {
+            throw ValidationException::withMessages(['permissions' => ['You cannot limit your own access.']]);
+        }
+
+        $admin->forceFill(['admin_permissions' => AdminPermissions::normalise($permissions)])->save();
+
+        return ['message' => "{$admin->name}'s access was updated.", 'admin' => $this->adminPayload($admin)];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function adminPayload(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'permissions' => $user->admin_permissions,
+            'created_at' => $user->created_at?->toIso8601String(),
+        ];
     }
 
     /**

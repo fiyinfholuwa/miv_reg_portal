@@ -6,14 +6,17 @@ import RegistrationModal from '../conference/RegistrationModal';
 import { AccountUser, EventRegistration, MivEvent, PRIMARY_EVENT_SLUG, apiRequest, clearSession, fetchAccount, fetchMyRegistrations, fetchPhotoUrl, readSession } from '../../lib/events';
 import EventWorkspace, { EventTab, tabFromSlug } from './EventWorkspace';
 import { OrderHistory, Profile } from './AccountPanels';
-import { AccountMenu, EventSwitcher, Icon } from './DashboardChrome';
+import { AccountMenu, BottomNav, EventSwitcher, Icon } from './DashboardChrome';
+import NotificationBell from './NotificationBell';
+import InAppShop from '../shop/InAppShop';
 import { Countdown, api } from './ui';
 import QRCode from '../shop/QRCode';
 
 type Route =
   | { kind: 'home' }
   | { kind: 'event'; slug: string; tabSlug?: string }
-  | { kind: 'store' | 'order-history' | 'profile' }
+  | { kind: 'shop'; view: 'catalog' | 'cart' | 'product'; productSlug?: string }
+  | { kind: 'order-history' | 'profile' }
   | { kind: 'legacy'; tabSlug: string };
 
 /** Old single-conference URLs now live under the IMLC workspace. */
@@ -23,7 +26,12 @@ function parseRoute(pathname: string): Route {
   const [, , section, slug, tab] = pathname.split('/');
   if (!section) return { kind: 'home' };
   if (section === 'events' && slug) return { kind: 'event', slug, tabSlug: tab };
-  if (section === 'store' || section === 'order-history' || section === 'profile') return { kind: section };
+  // /dashboard/store is the old address of the shop.
+  if (section === 'shop' || section === 'store') {
+    if (!slug) return { kind: 'shop', view: 'catalog' };
+    return slug === 'cart' ? { kind: 'shop', view: 'cart' } : { kind: 'shop', view: 'product', productSlug: slug };
+  }
+  if (section === 'order-history' || section === 'profile') return { kind: section };
   if (section in LEGACY_TABS) return { kind: 'legacy', tabSlug: LEGACY_TABS[section] };
   return { kind: 'home' };
 }
@@ -66,9 +74,6 @@ export default function UserDashboardFunctional() {
   const hasPhoto = profile?.has_photo ?? false;
   useEffect(() => { if (hasPhoto) void fetchPhotoUrl().then(setPhotoUrl); }, [hasPhoto]);
 
-  // The shop lives on its own page now; old /dashboard/store links go there.
-  useEffect(() => { if (route.kind === 'store') window.location.assign('/shop'); }, [route.kind]);
-
   const go = useCallback((href: string) => {
     setWelcome(false);
     router.push(href);
@@ -98,23 +103,25 @@ export default function UserDashboardFunctional() {
     window.location.assign('/');
   };
 
-  if (loading || !profile || route.kind === 'store') {
-    return <main className="grid h-dvh place-items-center bg-[#f6f2e9]"><div className="flex flex-col items-center gap-3"><img src="/images/miv-logo.png" alt="" className="h-12 w-12 animate-pulse object-contain" /><span className="text-sm font-bold text-[#0b4779]">{route.kind === 'store' ? 'Opening the shop…' : 'Loading your dashboard…'}</span></div></main>;
+  if (loading || !profile) {
+    return <main className="grid h-dvh place-items-center bg-[#f6f2e9]"><div className="flex flex-col items-center gap-3"><img src="/images/miv-logo.png" alt="" className="h-12 w-12 animate-pulse object-contain" /><span className="text-sm font-bold text-[#0b4779]">Loading your dashboard…</span></div></main>;
   }
 
   const activeTab: EventTab | null = activeRegistration ? tabFromSlug(activeRegistration.event, route.kind === 'event' ? route.tabSlug : undefined) : null;
   const firstName = profile.name.split(' ')[0];
   const initials = profile.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
-  const title = route.kind === 'home' ? `Hello, ${firstName}` : route.kind === 'event' ? (activeRegistration?.event.short_name ?? 'Event') : route.kind === 'profile' || route.kind === 'order-history' ? ACCOUNT_TITLES[route.kind] : '';
-  const subtitle = route.kind === 'home' ? `${registrations.length} event${registrations.length === 1 ? '' : 's'} registered` : route.kind === 'event' ? activeRegistration?.event.date_label : route.kind === 'order-history' ? 'Your shop orders and pickup codes' : 'Your details and attending-card photo';
+  const title = route.kind === 'home' ? `Hello, ${firstName}` : route.kind === 'event' ? (activeRegistration?.event.short_name ?? 'Event') : route.kind === 'shop' ? (route.view === 'cart' ? 'Your cart' : 'Shop') : route.kind === 'legacy' ? '' : ACCOUNT_TITLES[route.kind];
+  const subtitle = route.kind === 'home' ? `${registrations.length} event${registrations.length === 1 ? '' : 's'} registered` : route.kind === 'event' ? activeRegistration?.event.date_label : route.kind === 'shop' ? 'Pay online, collect at the venue' : route.kind === 'order-history' ? 'Your shop orders and pickup codes' : 'Your details and attending-card photo';
+  // Inside an event the workspace shows its own bottom bar; elsewhere the dashboard one.
+  const eventNavShown = route.kind === 'event' && Boolean(activeRegistration && activeTab);
 
   const sideLink = (active: boolean) => `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${active ? 'bg-[#e7f1fa] text-[#0b4779]' : 'text-ink/70 hover:bg-ink/5 hover:text-ink'}`;
-  const tabs: { key: string; label: string; icon: Parameters<typeof Icon>[0]['name']; href: string; active: boolean; external?: boolean }[] = [
-    { key: 'home', label: 'Home', icon: 'home', href: '/dashboard', active: route.kind === 'home' || route.kind === 'event' },
-    { key: 'find', label: 'Discover', icon: 'search', href: '/events', active: false, external: true },
-    { key: 'shop', label: 'Shop', icon: 'bag', href: '/shop', active: false, external: true },
-    { key: 'orders', label: 'Orders', icon: 'receipt', href: '/dashboard/order-history', active: route.kind === 'order-history' },
-    { key: 'profile', label: 'Profile', icon: 'user', href: '/dashboard/profile', active: route.kind === 'profile' },
+  const bottomItems = [
+    { key: 'home', label: 'Home', icon: 'home' as const, active: route.kind === 'home', onClick: () => go('/dashboard') },
+    { key: 'events', label: 'Events', icon: 'compass' as const, active: false, onClick: () => window.location.assign('/events') },
+    { key: 'shop', label: 'Shop', icon: 'bag' as const, active: route.kind === 'shop', onClick: () => go('/dashboard/shop') },
+    { key: 'orders', label: 'Orders', icon: 'receipt' as const, active: route.kind === 'order-history', onClick: () => go('/dashboard/order-history') },
+    { key: 'profile', label: 'Profile', icon: 'user' as const, active: route.kind === 'profile', onClick: () => go('/dashboard/profile') },
   ];
 
   return (
@@ -136,7 +143,7 @@ export default function UserDashboardFunctional() {
 
           <p className="mb-1 mt-6 px-3 text-[11px] font-bold uppercase tracking-[.14em] text-ink/40">Account</p>
           <button type="button" onClick={() => go('/dashboard/profile')} className={sideLink(route.kind === 'profile')}><Icon name="user" className="text-[#1469a9]" />Profile</button>
-          <a href="/shop" className={sideLink(false)}><Icon name="bag" className="text-[#1469a9]" /><span className="flex-1">Shop</span><Icon name="external" size={14} className="text-ink/35" /></a>
+          <button type="button" onClick={() => go('/dashboard/shop')} className={sideLink(route.kind === 'shop')}><Icon name="bag" className="text-[#1469a9]" />Shop</button>
           <button type="button" onClick={() => go('/dashboard/order-history')} className={sideLink(route.kind === 'order-history')}><Icon name="receipt" className="text-[#1469a9]" />Order history</button>
         </nav>
         <div className="mt-auto flex items-center gap-3 rounded-2xl bg-[#f5ecd9] p-3">
@@ -157,32 +164,25 @@ export default function UserDashboardFunctional() {
           )}
           <div className="hidden min-w-0 flex-1 lg:block"><h1 className="truncate text-2xl font-bold leading-tight text-[#0b2c4a]">{title}</h1>{subtitle && <p className="truncate text-sm text-ink/50">{subtitle}</p>}</div>
           {route.kind === 'home' && joinable.length > 0 && <button type="button" onClick={() => document.getElementById('join')?.scrollIntoView({ behavior: 'smooth' })} className="hidden shrink-0 rounded-full border border-ink/15 px-4 py-2 text-xs font-bold text-[#0b4779] transition hover:border-[#1469a9] sm:inline-flex">Join another event</button>}
+          <NotificationBell go={go} />
           <AccountMenu name={profile.name} initials={initials} photoUrl={photoUrl} onProfile={() => go('/dashboard/profile')} onLogout={() => void logout()} />
         </header>
 
-        {/* Mobile dashboard menu: event-specific navigation uses the bottom bar. */}
-        <nav className="grid shrink-0 grid-cols-5 border-b border-ink/10 bg-white px-1 pb-1.5 pt-1 lg:hidden" aria-label="Dashboard sections">
-          {tabs.map((tab) => {
-            const className = `flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[11px] font-bold transition ${tab.active ? 'text-[#0b4779]' : 'text-ink/50'}`;
-            const inner = <><span className={`grid h-7 w-12 place-items-center rounded-full transition ${tab.active ? 'bg-[#e7f1fa]' : ''}`}><Icon name={tab.icon} size={20} /></span>{tab.label}</>;
-            return tab.external
-              ? <a key={tab.key} href={tab.href} className={className}>{inner}</a>
-              : <button key={tab.key} type="button" onClick={() => go(tab.href)} aria-current={tab.active ? 'page' : undefined} className={className}>{inner}</button>;
-          })}
-        </nav>
 
         {/* Only this area scrolls. */}
         <div ref={content} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <section className="w-full px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8 2xl:px-10">
+          <section className="w-full px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pt-7 lg:px-8 lg:py-8 2xl:px-10">
             {route.kind === 'home' && <MyEvents registrations={registrations} joinable={joinable} go={go} />}
             {route.kind === 'event' && activeRegistration && activeTab && <EventWorkspace registration={activeRegistration} profile={profile} tab={activeTab} welcome={welcome} go={go} onRegistrationChange={(updated) => setRegistrations((current) => current.map((item) => item.id === updated.id ? updated : item))} onPhotoSaved={() => setProfile((current) => current ? { ...current, has_photo: true } : current)} />}
             {route.kind === 'event' && activeRegistration && !activeTab && <NotFound text="That section isn’t available for this event." action={() => go(`/dashboard/events/${activeRegistration.event.slug}`)} actionLabel="Back to event" />}
             {route.kind === 'event' && !activeRegistration && <NotRegistered slug={route.slug} event={catalog.find((event) => event.slug === route.slug)} />}
             {route.kind === 'profile' && <Profile profile={profile} onSaved={setProfile} onLogout={() => void logout()} />}
             {route.kind === 'order-history' && <OrderHistory />}
+            {route.kind === 'shop' && <InAppShop view={route.view} productSlug={route.productSlug} go={go} />}
           </section>
         </div>
 
+        {!eventNavShown && <BottomNav items={bottomItems} label="Dashboard sections" />}
       </div>
     </main>
   );
@@ -291,7 +291,7 @@ function NotRegistered({ slug, event }: { slug: string; event?: MivEvent }) {
 }
 
 function NotFound({ text, action, actionLabel }: { text: string; action: () => void; actionLabel: string }) {
-  return <section className="max-w-2xl rounded-[1.75rem] border border-ink/10 bg-white p-7 shadow-sm"><p className="text-ink/60">{text}</p><button type="button" onClick={action} className="mt-5 rounded-full bg-[#1469a9] px-5 py-2.5 text-sm font-bold text-white">{actionLabel}</button></section>;
+  return <section className="max-w-2xl rounded-[1.75rem] border border-ink/10 bg-white p-7 shadow-sm"><p className="text-ink/60">{text}</p><button type="button" onClick={action} className="inline-flex min-h-10 items-center justify-center mt-5 rounded-full bg-[#1469a9] px-5 py-2.5 text-sm font-bold text-white">{actionLabel}</button></section>;
 }
 
 

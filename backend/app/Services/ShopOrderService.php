@@ -86,6 +86,7 @@ class ShopOrderService
 
         $order->update(['status' => 'paid', 'paid_at' => now(), 'pickup_code' => $order->pickup_code ?: $this->newPickupCode(), 'payment_data' => ['verify' => $payment]]);
         $user->shopCartItems()->delete();
+        app(NotificationService::class)->notify($user, 'order', 'Order paid', "Your pickup code is {$order->pickup_code}. Show its QR code at the conference store.", '/dashboard/order-history');
 
         return $this->payload($order->fresh('items'));
     }
@@ -117,6 +118,7 @@ class ShopOrderService
         }
 
         $order->update(['collected_at' => now(), 'collected_by' => $admin->id]);
+        app(NotificationService::class)->notify($order->user, 'order', 'Order collected', "Order {$order->reference} was handed over at the store. Enjoy!", '/dashboard/order-history');
 
         return ['message' => "Order for {$order->user?->name} marked as collected.", 'order' => [...$this->payload($order->fresh('items')), 'user' => ['name' => $order->user?->name, 'email' => $order->user?->email]]];
     }

@@ -39,35 +39,35 @@ class AdminController extends Controller
 
     public function updateEventContent(EventContentRequest $request, Event $event): JsonResponse
     {
-        $this->adminService->ensureAdmin($request->user());
+        $this->adminService->ensureAdmin($request->user(), 'events');
 
         return response()->json($this->eventContentService->update($event, $request->validated()));
     }
 
     public function createEvent(EventDetailsRequest $request): JsonResponse
     {
-        $this->adminService->ensureAdmin($request->user());
+        $this->adminService->ensureAdmin($request->user(), 'events');
 
         return response()->json($this->eventContentService->create($request->validated()), 201);
     }
 
     public function updateEvent(EventDetailsRequest $request, Event $event): JsonResponse
     {
-        $this->adminService->ensureAdmin($request->user());
+        $this->adminService->ensureAdmin($request->user(), 'events');
 
         return response()->json($this->eventContentService->updateDetails($event, $request->validated()));
     }
 
     public function deleteEvent(Request $request, Event $event): JsonResponse
     {
-        $this->adminService->ensureAdmin($request->user());
+        $this->adminService->ensureAdmin($request->user(), 'events');
 
         return response()->json($this->eventContentService->delete($event));
     }
 
     public function upload(AdminUploadRequest $request): JsonResponse
     {
-        $this->adminService->ensureAdmin($request->user());
+        $this->adminService->ensureAdmin($request->user(), ['events', 'media', 'merch']);
 
         return response()->json($this->eventContentService->upload($request->file('image')), 201);
     }
@@ -83,7 +83,10 @@ class AdminController extends Controller
 
     public function overview(Request $request): JsonResponse
     {
-        return response()->json($this->adminService->overview($request->user()));
+        $slug = $request->string('event')->toString();
+        $event = $slug !== '' ? Event::where('slug', $slug)->firstOrFail() : null;
+
+        return response()->json($this->adminService->overview($request->user(), $event));
     }
 
     public function registrants(Request $request): JsonResponse
@@ -148,9 +151,9 @@ class AdminController extends Controller
 
     public function shopOrders(Request $request): JsonResponse
     {
-        $this->adminService->ensureAdmin($request->user());
+        $this->adminService->ensureAdmin($request->user(), ['finance', 'merch']);
 
-        return response()->json(['orders' => app(ShopOrderService::class)->adminOrders($request->user())]);
+        return response()->json(['orders' => $this->adminService->withOrderEvents(app(ShopOrderService::class)->adminOrders($request->user()))]);
     }
 
     public function reviewPartnerInquiry(PartnerInquiryReviewRequest $request, PartnerInquiry $inquiry): JsonResponse

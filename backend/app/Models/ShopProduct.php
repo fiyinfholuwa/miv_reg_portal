@@ -6,8 +6,9 @@ use Database\Factories\ShopProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['name', 'description', 'price', 'image', 'tag', 'colors', 'sizes', 'stock', 'active', 'sort_order'])]
+#[Fillable(['event_id', 'name', 'description', 'price', 'image', 'tag', 'colors', 'sizes', 'stock', 'active', 'sort_order'])]
 class ShopProduct extends Model
 {
     /** @use HasFactory<ShopProductFactory> */
@@ -23,6 +24,11 @@ class ShopProduct extends Model
             'colors' => 'array',
             'sizes' => 'array',
         ];
+    }
+
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(Event::class);
     }
 
     /** @return list<string> */

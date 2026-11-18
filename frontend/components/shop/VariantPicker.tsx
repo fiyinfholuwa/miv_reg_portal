@@ -83,7 +83,7 @@ export function SwatchRow({ colors, value, onChange }: { colors: ProductColor[];
           aria-pressed={color.name === value}
           aria-label={color.name}
           title={color.name}
-          className={`grid h-6 w-6 place-items-center rounded-full transition ${color.name === value ? 'ring-[1.5px] ring-[#0c0d10] ring-offset-1' : 'hover:ring-1 hover:ring-[#6b7280]'}`}
+          className={`relative grid h-6 w-6 place-items-center rounded-full transition before:absolute before:-inset-1.5 before:content-[''] ${color.name === value ? 'ring-[1.5px] ring-[#0c0d10] ring-offset-1' : 'hover:ring-1 hover:ring-[#6b7280]'}`}
         >
           <Swatch hex={color.hex} size={16} />
         </button>

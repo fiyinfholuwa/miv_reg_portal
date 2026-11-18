@@ -22,7 +22,7 @@ class SiteContentController extends Controller
 
     public function update(SiteContentRequest $request, string $section): JsonResponse
     {
-        $this->adminService->ensureAdmin($request->user());
+        $this->adminService->ensureAdmin($request->user(), 'media');
 
         return response()->json($this->siteContentService->save($request->user(), $section, $request->validated()));
     }

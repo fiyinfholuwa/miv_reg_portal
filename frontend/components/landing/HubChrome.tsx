@@ -4,7 +4,7 @@ import { errorMessage, toast } from '../../lib/toast';
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { apiUrl } from '../../lib/api';
-import { openRegistration, useHasSession } from './hub-data';
+import { logout, openRegistration, useHasSession } from './hub-data';
 import { useSiteContent } from '../../lib/site-content';
 
 const navLinks = [
@@ -84,6 +84,7 @@ export function HubNav({ registerSlug = 'imlc', variant = 'overlay' }: { registe
             </div>
             <div className="flex items-center gap-3">
               <AccountLink hasSession={hasSession} className="hidden text-[15px] font-semibold text-[#dceaf5] transition hover:text-white lg:inline" />
+              {hasSession && <button type="button" onClick={() => void logout()} className="hidden rounded-full border border-white/25 px-[18px] py-2.5 text-sm font-bold text-[#faf6ec] transition hover:bg-white/10 lg:inline-flex">Log out</button>}
               {!hasSession && <button type="button" onClick={() => openRegistration({ event: registerSlug })} className="hidden rounded-full bg-[#a82e26] px-[22px] py-3 text-sm font-bold text-white transition hover:bg-[#8c1f1c] sm:inline-flex">Register Now</button>}
               <button type="button" onClick={() => setOpen(true)} className="grid h-[42px] w-[42px] place-items-center rounded-full bg-white/[.14] text-[#faf6ec] lg:hidden" aria-label="Open menu" aria-expanded={open}><MenuIcon /></button>
             </div>
@@ -100,6 +101,7 @@ export function HubNav({ registerSlug = 'imlc', variant = 'overlay' }: { registe
             {navLinks.map((link) => <Link key={link.label} href={link.href} onClick={() => setOpen(false)} className="border-b border-white/10 py-3 text-lg font-semibold">{link.label}</Link>)}
             <button type="button" onClick={() => { setOpen(false); openPartner(); }} className="border-b border-white/10 py-3 text-left text-lg font-semibold">Partner</button>
             <AccountLink hasSession={hasSession} className="border-b border-white/10 py-3 text-left text-lg font-semibold" />
+            {hasSession && <button type="button" onClick={() => { setOpen(false); void logout(); }} className="mt-6 rounded-full border border-white/25 py-[15px] text-[15px] font-bold text-[#faf6ec]">Log out</button>}
             {!hasSession && <button type="button" onClick={() => { setOpen(false); openRegistration({ event: registerSlug }); }} className="mt-6 rounded-full bg-[#a82e26] py-[15px] text-[15px] font-bold text-white">Register Now</button>}
           </div>
         </div>
@@ -117,17 +119,17 @@ export function HubFooter() {
         <div className="flex items-center gap-3"><img src="/images/miv-logo.png" alt="MIV" className="h-12 w-12 object-contain" /><span className="text-[17px] font-bold leading-[1.15] text-[#0c0d10]">The Men of<br />Issachar Vision Inc.</span></div>
         <span className="text-sm text-[#4d5460]">{contact.copyright}</span>
       </div>
-      <div className="flex flex-col gap-2.5 text-[15px] font-medium text-[#22262e]">
-        <span className="text-sm font-bold text-[#0c0d10]">Explore</span>
-        <Link href="/events" className="hover:text-[#a82e26]">Events</Link>
-        <Link href="/#gallery" className="hover:text-[#a82e26]">Gallery</Link>
-        <Link href="/shop" className="hover:text-[#a82e26]">Shop</Link>
-        <button type="button" onClick={openPartner} className="text-left hover:text-[#a82e26]">Partner</button>
+      <div className="flex flex-col gap-1 text-[15px] font-medium text-[#22262e]">
+        <span className="mb-1.5 text-sm font-bold text-[#0c0d10]">Explore</span>
+        <Link href="/events" className="py-1.5 hover:text-[#a82e26]">Events</Link>
+        <Link href="/#gallery" className="py-1.5 hover:text-[#a82e26]">Gallery</Link>
+        <Link href="/shop" className="py-1.5 hover:text-[#a82e26]">Shop</Link>
+        <button type="button" onClick={openPartner} className="py-1.5 text-left hover:text-[#a82e26]">Partner</button>
       </div>
-      <div className="flex flex-col gap-2.5 text-[15px] leading-normal text-[#22262e]">
-        <span className="text-sm font-bold text-[#0c0d10]">Contact</span>
-        {contact.email && <a href={`mailto:${contact.email}`} className="break-all hover:text-[#a82e26]">{contact.email}</a>}
-        {contact.phone && <a href={`tel:${contact.phone.replace(/[^0-9+]/g, '')}`} className="hover:text-[#a82e26]">{contact.phone}</a>}
+      <div className="flex flex-col gap-1 text-[15px] leading-normal text-[#22262e]">
+        <span className="mb-1.5 text-sm font-bold text-[#0c0d10]">Contact</span>
+        {contact.email && <a href={`mailto:${contact.email}`} className="break-all py-1.5 hover:text-[#a82e26]">{contact.email}</a>}
+        {contact.phone && <a href={`tel:${contact.phone.replace(/[^0-9+]/g, '')}`} className="py-1.5 hover:text-[#a82e26]">{contact.phone}</a>}
         {contact.address && <span>{contact.address}</span>}
       </div>
     </footer>

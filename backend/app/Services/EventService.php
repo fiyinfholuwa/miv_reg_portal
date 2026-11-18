@@ -90,6 +90,10 @@ class EventService
             $this->mirrorPrimaryEventOntoUser($user, $registration);
         }
 
+        if ($existing === null) {
+            app(NotificationService::class)->notify($user, 'event', "You're registered for {$event->short_name}", "Your ticket code is {$registration->ticket_code}. Your pass, programme and attending card are ready.", '/dashboard/events/'.$event->slug);
+        }
+
         return [
             'created' => $existing === null,
             'registration' => $this->registrationPayload($registration->load('event')),

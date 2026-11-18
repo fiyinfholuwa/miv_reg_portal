@@ -14,6 +14,8 @@ export type ShopProduct = {
   image?: string | null;
   tag?: string | null;
   stock?: number | null;
+  /** The event this product belongs to, when it was made for one. */
+  event?: { slug: string; short_name: string } | null;
   colors?: ProductColor[] | null;
   sizes?: string[] | null;
 };
@@ -162,10 +164,10 @@ export async function fetchAccountCart(): Promise<AccountCart | null> {
 
 /**
  * Replaces the signed-in account's server cart. Pass the full product list:
- * lines whose product is missing from it are left out of the saved cart.
- * Lines still waiting for a colour/size choice are kept locally only.
+ * lines whose product is missing from it are left out of the saved cart, as
+ * are lines still waiting for a colour/size choice.
  */
-export async function persistAccountCart(cart: Cart, products: ShopProduct[], accountId?: number): Promise<boolean> {
+export async function persistAccountCart(cart: Cart, products: ShopProduct[]): Promise<boolean> {
   const token = typeof window === 'undefined' ? null : window.localStorage.getItem('jan-conf-session');
   if (!token) return false;
 
@@ -177,10 +179,15 @@ export async function persistAccountCart(cart: Cart, products: ShopProduct[], ac
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ items }),
     });
-    if (!response.ok) return false;
-    if (accountId) window.localStorage.setItem('jan-conf-cart-owner', String(accountId));
-    return true;
+    return response.ok;
   } catch {
     return false;
   }
+}
+
+/** Products grouped by the event they were made for, for the catalog filter chips. */
+export function productEvents(products: ShopProduct[]) {
+  const events = new Map<string, string>();
+  products.forEach((product) => { if (product.event) events.set(product.event.slug, product.event.short_name); });
+  return [...events.entries()].map(([slug, shortName]) => ({ slug, short_name: shortName }));
 }

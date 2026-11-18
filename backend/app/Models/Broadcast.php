@@ -11,7 +11,7 @@ class Broadcast extends Model
 {
     protected function casts(): array
     {
-        return ['scheduled_at' => 'datetime'];
+        return ['scheduled_at' => 'datetime', 'pushed_at' => 'datetime'];
     }
 
     public function creator(): BelongsTo

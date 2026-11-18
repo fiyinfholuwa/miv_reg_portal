@@ -76,8 +76,12 @@ export function readSession() {
   }
 }
 
+/** Fired on window when someone signs in on the current page. */
+export const SESSION_CHANGED_EVENT = 'miv-session-changed';
+
 export function saveSession(token: string) {
   window.localStorage.setItem(SESSION_KEY, token);
+  window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
 }
 
 export function clearSession() {

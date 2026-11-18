@@ -14,6 +14,7 @@ class ShopProductRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'event_id' => ['nullable', 'integer', 'exists:events,id'],
             'name' => ['required', 'string', 'max:160'],
             'description' => ['nullable', 'string', 'max:2000'],
             'price' => ['required', 'integer', 'min:0'],

@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Support\AdminPermissions;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 class AdminUserRequest extends FormRequest
@@ -27,6 +29,8 @@ class AdminUserRequest extends FormRequest
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:160', 'unique:users,email'],
             'password' => ['required', 'string', Password::min(10)->letters()->numbers()],
+            'permissions' => ['sometimes', 'nullable', 'array', 'min:1'],
+            'permissions.*' => ['string', 'distinct', Rule::in(AdminPermissions::ALL)],
         ];
     }
 }

@@ -24,6 +24,10 @@ const paths: Record<string, ReactNode> = {
   bed: <><path d="M3 19V6M3 15h18v4M21 15v-3a3 3 0 0 0-3-3h-7v6" /><circle cx="7" cy="11" r="2" /></>,
   grid: <><rect x="4" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" /></>,
   external: <><path d="M14 4h6v6M20 4l-9 9" /><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" /></>,
+  qr: <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><path d="M14 14h2v2h-2zM18 14h2M14 18v2h2M18 18h2v2" /></>,
+  live: <><circle cx="12" cy="12" r="2" /><path d="M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8" /></>,
+  bell: <><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15L6 16Z" /><path d="M10 20a2 2 0 0 0 4 0" /></>,
+  compass: <><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z" /></>,
 };
 
 export function Icon({ name, size = 20, className = '' }: { name: keyof typeof paths; size?: number; className?: string }) {
@@ -115,5 +119,29 @@ export function AccountMenu({ name, initials, photoUrl, onProfile, onLogout }: {
         </div>
       )}
     </div>
+  );
+}
+
+export type BottomNavItem = { key: string; label: string; icon: keyof typeof paths; active: boolean; onClick: () => void; badge?: number };
+
+/**
+ * Phone/tablet bottom navigation: icon over label, the active item in blue.
+ * Pages using it add `pb-[calc(5.5rem+env(safe-area-inset-bottom))]` to their scroll area.
+ */
+export function BottomNav({ items, label }: { items: BottomNavItem[]; label: string }) {
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 rounded-t-[1.5rem] border-t border-ink/10 bg-white/95 px-1 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 shadow-[0_-8px_30px_rgba(3,40,74,.08)] backdrop-blur lg:hidden" aria-label={label}>
+      <ul className="m-0 mx-auto flex max-w-xl list-none justify-around p-0">
+        {items.map((item) => (
+          <li key={item.key} className="flex-1">
+            <button type="button" onClick={item.onClick} aria-current={item.active ? 'page' : undefined} className={`relative flex min-h-[52px] w-full flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-semibold transition active:bg-ink/5 ${item.active ? 'text-[#0b4779]' : 'text-ink/45'}`}>
+              <Icon name={item.icon} size={24} className={item.active ? 'text-[#1469a9]' : ''} />
+              <span className="max-w-full truncate leading-none">{item.label}</span>
+              {item.badge ? <span className="absolute right-[calc(50%-20px)] top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-coral px-1 text-[10px] font-bold text-white">{item.badge > 9 ? '9+' : item.badge}</span> : null}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }

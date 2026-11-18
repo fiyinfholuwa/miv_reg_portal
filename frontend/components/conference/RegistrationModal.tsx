@@ -443,7 +443,7 @@ function Field({ label, className = '', children }: { label: string; className?:
 }
 
 function SwitchPrompt({ text, action, onClick }: { text: string; action: string; onClick: () => void }) {
-  return <p className="rounded-xl bg-[#f4eddc] px-4 py-3 text-sm text-[#4d5460]">{text} <button type="button" onClick={onClick} className="font-bold text-[#a82e26] underline-offset-2 hover:underline">{action} →</button></p>;
+  return <p className="rounded-xl bg-[#f4eddc] px-4 py-3 text-sm text-[#4d5460]">{text} <button type="button" onClick={onClick} className="-my-2 inline-block py-2 font-bold text-[#a82e26] underline-offset-2 hover:underline">{action} →</button></p>;
 }
 
 function stepList(flow: 'register' | 'login', event: MivEvent | null) {

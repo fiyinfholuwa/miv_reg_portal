@@ -81,7 +81,7 @@ export function OrderHistory() {
       <div className="flex flex-col items-center gap-3 rounded-[1.5rem] border border-dashed border-ink/15 bg-white p-10 text-center">
         <p className="m-0 font-bold">No orders yet</p>
         <p className="m-0 text-sm text-ink/55">Paid orders show here with a pickup QR code for the conference store.</p>
-        <a href="/shop" className="mt-1 rounded-full bg-[#1469a9] px-5 py-2.5 text-sm font-bold text-white">Visit the shop</a>
+        <a href="/shop" className="inline-flex min-h-10 items-center justify-center mt-1 rounded-full bg-[#1469a9] px-5 py-2.5 text-sm font-bold text-white">Visit the shop</a>
       </div>
     );
   }

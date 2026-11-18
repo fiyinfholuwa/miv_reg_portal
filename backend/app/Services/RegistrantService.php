@@ -84,6 +84,9 @@ class RegistrantService
             ->when($filters['verified'] ?? null, fn (Builder $query, string $verified) => $verified === 'yes' ? $query->whereNotNull('email_verified_at') : $query->whereNull('email_verified_at'))
             ->when($filters['role'] ?? null, fn (Builder $query, string $role) => $query->where('role', $role))
             ->when($filters['event'] ?? null, fn (Builder $query, string $slug) => $query->whereHas('eventRegistrations.event', fn (Builder $event) => $event->where('slug', $slug)))
+            ->when(filter_var($filters['accommodation'] ?? false, FILTER_VALIDATE_BOOLEAN), fn (Builder $query) => $query->whereHas('eventRegistrations', fn (Builder $registration) => $registration
+                ->where('needs_accommodation', true)
+                ->when($filters['event'] ?? null, fn (Builder $scoped, string $slug) => $scoped->whereHas('event', fn (Builder $event) => $event->where('slug', $slug)))))
             ->when($filters['from'] ?? null, fn (Builder $query, string $from) => $query->where('created_at', '>=', Carbon::parse($from, 'Africa/Lagos')->startOfDay()->utc()))
             ->when($filters['to'] ?? null, fn (Builder $query, string $to) => $query->where('created_at', '<=', Carbon::parse($to, 'Africa/Lagos')->endOfDay()->utc()));
     }
@@ -111,6 +114,7 @@ class RegistrantService
                 'short_name' => $registration->event?->short_name,
                 'ticket_code' => $registration->ticket_code,
                 'attendance_mode' => $registration->attendance_mode,
+                'needs_accommodation' => (bool) $registration->needs_accommodation,
                 'team' => $registration->team?->name,
                 'checked_in_at' => $registration->checked_in_at?->toIso8601String(),
             ])->values()->all(),

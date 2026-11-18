@@ -7,7 +7,7 @@ import { SessionState, dayLabel, defaultDayIndex, formatTime, lagosNow, sessionS
 import QRCode from '../shop/QRCode';
 import { Countdown, api } from './ui';
 import { errorMessage, toast } from '../../lib/toast';
-import { Icon } from './DashboardChrome';
+import { BottomNav, Icon } from './DashboardChrome';
 
 export type EventTab = 'pass' | 'programme' | 'live' | 'attending-card' | 'team' | 'publicity-kit' | 'testimonials' | 'hotels-travel';
 
@@ -24,8 +24,10 @@ const TABS: { tab: EventTab; label: string; icon: IconName; description: string;
   { tab: 'hotels-travel', label: 'Hotels & travel', icon: 'bed', description: 'Places to stay nearby', slug: 'hotels-travel' },
 ];
 
-/** Shown directly in the phone tab bar; the rest sit behind "More". */
-const PRIMARY_TABS: EventTab[] = ['pass', 'programme', 'live'];
+/** Shown directly in the phone bottom bar (after Home); the rest sit behind "More". */
+const PRIMARY_TABS: EventTab[] = ['programme', 'pass', 'live'];
+const BOTTOM_LABELS: Partial<Record<EventTab, string>> = { pass: 'Pass', programme: 'Programme', live: 'Live' };
+const BOTTOM_ICONS: Partial<Record<EventTab, IconName>> = { pass: 'qr', programme: 'calendar', live: 'live' };
 
 export function eventTabs(event: MivEvent) {
   return TABS.filter((item) => item.tab !== 'hotels-travel' || event.offers_accommodation);
@@ -59,7 +61,7 @@ export default function EventWorkspace({ registration, profile, tab, welcome, go
   }, [welcome, event.short_name]);
 
   return (
-    <div className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
+    <div>
       <header className="relative overflow-hidden rounded-[1.5rem] bg-[#03284a] text-white">
         {event.image && <img src={event.image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />}
         <div className="absolute inset-0 bg-gradient-to-r from-[#001428] via-[#001428]/80 to-transparent" />
@@ -102,7 +104,7 @@ function daysLabel(registration: EventRegistration) {
 function SectionNav({ event, tab, go }: { event: MivEvent; tab: EventTab; go: (href: string) => void }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const sections = eventTabs(event);
-  const primary = sections.filter((item) => PRIMARY_TABS.includes(item.tab));
+  const primary = PRIMARY_TABS.map((key) => sections.find((item) => item.tab === key)).filter((item): item is (typeof sections)[number] => Boolean(item));
   const extra = sections.filter((item) => !PRIMARY_TABS.includes(item.tab));
   const activeExtra = extra.find((item) => item.tab === tab);
 
@@ -118,22 +120,27 @@ function SectionNav({ event, tab, go }: { event: MivEvent; tab: EventTab; go: (h
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-40 mb-0 border-t border-ink/10 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 backdrop-blur lg:sticky lg:inset-x-auto lg:bottom-auto lg:z-20 lg:-mx-8 lg:mb-5 lg:border-t-0 lg:bg-[#f6f2e9]/95 lg:px-8 lg:py-3 lg:backdrop-blur 2xl:-mx-10 2xl:px-10" aria-label={`${event.short_name} sections`}>
-        {/* Phones and tablets */}
-        <div className="flex items-center gap-1.5 lg:hidden">
-          {primary.map((item) => <button key={item.tab} type="button" onClick={() => open(item.tab)} aria-current={tab === item.tab ? 'page' : undefined} className={pill(tab === item.tab)}><Icon name={item.icon} size={16} className="hidden min-[400px]:block" />{item.label}</button>)}
-          {extra.length > 0 && (
-            <button type="button" onClick={() => setSheetOpen(true)} aria-haspopup="dialog" aria-expanded={sheetOpen} className={`${pill(Boolean(activeExtra))} ml-auto`}>
-              {activeExtra ? <><Icon name={activeExtra.icon} size={16} /><span className="max-w-[88px] truncate">{activeExtra.label}</span></> : <><Icon name="grid" size={16} />More</>}
-              <span className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] ${activeExtra ? 'bg-white/20' : 'bg-[#e7f1fa] text-[#0b4779]'}`}>{activeExtra ? '▾' : `+${extra.length}`}</span>
-            </button>
-          )}
-        </div>
-        {/* Desktop: everything visible */}
-        <div className="hidden flex-wrap gap-1.5 lg:flex">
+      {/* Desktop: every section in one row */}
+      <nav className="sticky top-0 z-20 -mx-8 mb-5 hidden bg-[#f6f2e9]/95 px-8 py-3 backdrop-blur lg:block 2xl:-mx-10 2xl:px-10" aria-label={`${event.short_name} sections`}>
+        <div className="flex flex-wrap gap-1.5">
           {sections.map((item) => <button key={item.tab} type="button" onClick={() => open(item.tab)} aria-current={tab === item.tab ? 'page' : undefined} className={pill(tab === item.tab)}><Icon name={item.icon} size={16} />{item.label}</button>)}
         </div>
       </nav>
+
+      {/* Phones and tablets: bottom bar */}
+      <BottomNav
+        label={`${event.short_name} sections`}
+        items={[
+          { key: 'home', label: 'Home', icon: 'home', active: false, onClick: () => go('/dashboard') },
+          ...primary.map((item) => ({ key: item.tab, label: BOTTOM_LABELS[item.tab] ?? item.label, icon: BOTTOM_ICONS[item.tab] ?? item.icon, active: tab === item.tab, onClick: () => open(item.tab) })),
+          ...(extra.length ? [{ key: 'more', label: activeExtra ? activeExtra.label : 'More', icon: activeExtra ? activeExtra.icon : 'grid' as IconName, active: Boolean(activeExtra) || sheetOpen, onClick: () => setSheetOpen(true) }] : []),
+        ]}
+      />
+      {/* Phones: show which section is open, since the header scrolls away */}
+      <div className="mb-4 mt-4 flex items-center justify-between lg:hidden">
+        <h2 className="flex items-center gap-2 text-lg font-bold text-[#03284a]"><Icon name={sections.find((item) => item.tab === tab)?.icon ?? 'grid'} size={20} className="text-[#1469a9]" />{sections.find((item) => item.tab === tab)?.label}</h2>
+        {extra.length > 0 && <button type="button" onClick={() => setSheetOpen(true)} className="min-h-10 rounded-full bg-white px-4 text-xs font-bold text-[#0b4779] ring-1 ring-ink/10">All sections</button>}
+      </div>
 
       {sheetOpen && (
         <div className="fixed inset-0 z-[120] flex items-end bg-[#001428]/50 backdrop-blur-[2px] lg:hidden" role="dialog" aria-modal="true" aria-labelledby="sections-title" onMouseDown={(mouseEvent) => { if (mouseEvent.target === mouseEvent.currentTarget) setSheetOpen(false); }}>
@@ -184,7 +191,7 @@ function PassPanel({ registration, profile, onRegistrationChange }: { registrati
           <div className="border-b border-dashed border-[#d9c99e] p-5"><p className="font-bold leading-tight">{event.short_name}</p><p className="text-xs text-ink/50">{event.date_label}{event.location ? ` · ${event.location}` : ''}</p></div>
           <div className="px-4 pt-5 sm:px-6"><QRCode value={registration.ticket_code} size={190} /></div>
           <p className="pb-5 pt-3 text-center font-mono text-lg font-bold tracking-[.16em] sm:text-xl">{registration.ticket_code}</p>
-          <div className="grid grid-cols-3 border-t border-[#e7dcc1] text-xs"><div className="p-4"><span className="block uppercase text-ink/45">Name</span><strong className="mt-1 block break-words">{profile.name}</strong></div><div className="border-x border-[#e7dcc1] p-4"><span className="block uppercase text-ink/45">Type</span><strong className="mt-1 block">{profile.role || 'Delegate'}</strong></div><div className="p-4"><span className="block uppercase text-ink/45">Mode</span><strong className="mt-1 block">{registration.attendance_mode || '—'}</strong></div></div>
+          <div className="grid grid-cols-3 border-t border-[#e7dcc1] text-xs"><div className="min-w-0 p-3 sm:p-4"><span className="block uppercase text-ink/45">Name</span><strong className="mt-1 block break-words">{profile.name}</strong></div><div className="min-w-0 border-x border-[#e7dcc1] p-3 sm:p-4"><span className="block uppercase text-ink/45">Type</span><strong className="mt-1 block">{profile.role || 'Delegate'}</strong></div><div className="min-w-0 p-3 sm:p-4"><span className="block uppercase text-ink/45">Mode</span><strong className="mt-1 block break-words">{registration.attendance_mode || '—'}</strong></div></div>
         </div>
       </section>
       <div className="grid content-start gap-6">
@@ -220,7 +227,7 @@ function AttendanceForm({ registration, onSaved }: { registration: EventRegistra
     <form onSubmit={save} className="rounded-[1.75rem] border border-ink/10 bg-white p-6 shadow-sm sm:p-8">
       <h3 className="font-display text-3xl uppercase text-[#03284a]">Manage attendance</h3>
       {event.attendance_options.length > 1 && <div className="mt-5 flex flex-wrap gap-2">{event.attendance_options.map((option) => <button key={option} type="button" aria-pressed={mode === option} onClick={() => setMode(option)} className={`rounded-full px-4 py-2.5 text-sm font-bold ${mode === option ? 'bg-[#1469a9] text-white' : 'border-2 border-ink/15 text-ink/65'}`}>{option}</button>)}</div>}
-      {event.day_options.length > 0 && <><p className="mt-5 text-xs font-bold uppercase tracking-[.12em] text-ink/50">Days</p><div className="mt-2 flex flex-wrap gap-2">{event.day_options.map((day) => <button key={day} type="button" aria-pressed={days.includes(day)} onClick={() => setDays((current) => current.includes(day) ? current.filter((item) => item !== day) : [...current, day])} className={`rounded-full px-4 py-2 text-xs font-bold ${days.includes(day) ? 'bg-ink text-white' : 'border-2 border-ink/15 text-ink/60'}`}>{day}</button>)}</div></>}
+      {event.day_options.length > 0 && <><p className="mt-5 text-xs font-bold uppercase tracking-[.12em] text-ink/50">Days</p><div className="mt-2 flex flex-wrap gap-2">{event.day_options.map((day) => <button key={day} type="button" aria-pressed={days.includes(day)} onClick={() => setDays((current) => current.includes(day) ? current.filter((item) => item !== day) : [...current, day])} className={`rounded-full px-4 py-2.5 text-xs font-bold ${days.includes(day) ? 'bg-ink text-white' : 'border-2 border-ink/15 text-ink/60'}`}>{day}</button>)}</div></>}
       {event.offers_accommodation && !/online/i.test(mode) && <label className="mt-5 flex items-center gap-3 text-sm font-semibold"><input type="checkbox" checked={accommodation} onChange={(changeEvent) => setAccommodation(changeEvent.target.checked)} className="h-5 w-5" /> I need accommodation</label>}
       <button type="submit" disabled={saving} className="mt-6 rounded-full bg-[#1469a9] px-6 py-3 text-sm font-bold text-white disabled:opacity-60">{saving ? 'Saving…' : 'Save changes'}</button>
     </form>
@@ -370,7 +377,7 @@ function TeamPanel({ registration, onChange }: { registration: EventRegistration
               <div className="mt-1 flex flex-wrap items-center justify-between gap-3"><strong className="font-mono text-2xl tracking-[.08em] text-[#0b4779]">{team.code}</strong><button type="button" onClick={() => void share()} className="rounded-full bg-[#eaf3fb] px-4 py-2 text-xs font-bold text-[#0b4779]">Copy invite</button></div>
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
-              {team.leader_phone && <a href={`https://wa.me/${team.leader_phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="rounded-full bg-white px-4 py-2 text-xs font-bold text-[#03284a]">Message team leader</a>}
+              {team.leader_phone && <a href={`https://wa.me/${team.leader_phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center rounded-full bg-white px-4 py-2 text-xs font-bold text-[#03284a]">Message team leader</a>}
               <button type="button" onClick={() => void leave()} disabled={busy} className="rounded-full border border-white/30 px-4 py-2 text-xs font-bold">Leave team</button>
             </div>
           </>
@@ -535,7 +542,7 @@ function TestimonialsPanel({ event }: { event: MivEvent }) {
         <h2 className="mt-2 text-xl font-bold">What did God do at {event.short_name}?</h2>
         <textarea value={text} onChange={(changeEvent) => setText(changeEvent.target.value.slice(0, MAX_TESTIMONY))} className="mt-4 min-h-36 w-full rounded-xl p-4 text-ink outline-none" placeholder="Tell us what God did..." aria-label="Your testimony" />
         <p className="mt-1 text-right text-[11px] text-[#9bc4e5]">{text.length}/{MAX_TESTIMONY}</p>
-        <div className="mt-2 flex flex-wrap gap-2">{TOPICS.map((item) => <button key={item} type="button" aria-pressed={topic === item} onClick={() => setTopic(item)} className={topic === item ? 'rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[#0b4779]' : 'rounded-full border border-white/30 px-3 py-1.5 text-xs font-bold'}>{item}</button>)}</div>
+        <div className="mt-2 flex flex-wrap gap-2">{TOPICS.map((item) => <button key={item} type="button" aria-pressed={topic === item} onClick={() => setTopic(item)} className={topic === item ? 'rounded-full bg-white px-3.5 py-2.5 text-xs font-bold text-[#0b4779]' : 'rounded-full border border-white/30 px-3.5 py-2.5 text-xs font-bold'}>{item}</button>)}</div>
         <label className="mt-4 flex items-center gap-3 text-sm"><input type="checkbox" checked={showName} onChange={(changeEvent) => setShowName(changeEvent.target.checked)} className="h-4 w-4" /> Show my name when published</label>
         <button type="submit" disabled={sending} className="mt-5 w-full rounded-full bg-white px-5 py-3 text-sm font-bold text-[#0b4779] disabled:opacity-60">{sending ? 'Sending…' : 'Send to media team'}</button>
       </form>
@@ -562,7 +569,7 @@ function HotelsPanel({ event }: { event: MivEvent }) {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div>
-        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">{filters.map((item) => <button key={item.label} type="button" aria-pressed={filter === item.label} onClick={() => setFilter(item.label)} className={filter === item.label ? 'shrink-0 rounded-full bg-[#03284a] px-4 py-2 text-xs font-bold text-white' : 'shrink-0 rounded-full bg-white px-4 py-2 text-xs font-bold text-ink/65 ring-1 ring-ink/10'}>{item.label}</button>)}</div>
+        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">{filters.map((item) => <button key={item.label} type="button" aria-pressed={filter === item.label} onClick={() => setFilter(item.label)} className={filter === item.label ? 'shrink-0 rounded-full bg-[#03284a] px-4 py-2.5 text-xs font-bold text-white' : 'shrink-0 rounded-full bg-white px-4 py-2.5 text-xs font-bold text-ink/65 ring-1 ring-ink/10'}>{item.label}</button>)}</div>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
           {shown.length === 0 && <p className="rounded-2xl bg-white p-6 text-sm text-ink/55 sm:col-span-2">No hotels match this filter.</p>}
           {shown.map((hotel) => (
@@ -578,10 +585,10 @@ function HotelsPanel({ event }: { event: MivEvent }) {
               </div>
               {hotel.notes && <p className="mt-2 px-1 text-sm text-ink/60">{hotel.notes}</p>}
               <div className="mt-auto flex flex-wrap gap-2 px-1 pt-4">
-                {hotel.phone && <a href={`tel:${hotel.phone.replace(/\s+/g, '')}`} className="rounded-full bg-[#03284a] px-4 py-2 text-xs font-bold text-white">Call</a>}
-                {hotel.phone && <a href={`https://wa.me/${hotel.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello, I'm attending ${event.short_name} and would like to book a room.`)}`} target="_blank" rel="noreferrer" className="rounded-full bg-[#dff2e5] px-4 py-2 text-xs font-bold text-[#2f7d4f]">WhatsApp</a>}
-                {hotel.url && <a href={hotel.url} target="_blank" rel="noreferrer" className="rounded-full border border-ink/15 px-4 py-2 text-xs font-bold text-[#0b4779]">Website ↗</a>}
-                <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${hotel.name} ${hotel.area ?? ''}`)}`} target="_blank" rel="noreferrer" className="rounded-full border border-ink/15 px-4 py-2 text-xs font-bold text-[#0b4779]">Map ↗</a>
+                {hotel.phone && <a href={`tel:${hotel.phone.replace(/\s+/g, '')}`} className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#03284a] px-4 py-2 text-xs font-bold text-white">Call</a>}
+                {hotel.phone && <a href={`https://wa.me/${hotel.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello, I'm attending ${event.short_name} and would like to book a room.`)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#dff2e5] px-4 py-2 text-xs font-bold text-[#2f7d4f]">WhatsApp</a>}
+                {hotel.url && <a href={hotel.url} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center rounded-full border border-ink/15 px-4 py-2 text-xs font-bold text-[#0b4779]">Website ↗</a>}
+                <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${hotel.name} ${hotel.area ?? ''}`)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center rounded-full border border-ink/15 px-4 py-2 text-xs font-bold text-[#0b4779]">Map ↗</a>
               </div>
             </article>
           ))}

@@ -7,19 +7,71 @@ import Link from 'next/link';
 import { apiUrl } from '../lib/api';
 import ShopQRCode from './ShopQRCode';
 import { HubFooter, HubNav } from './landing/HubChrome';
+import { CHECKOUT_ORIGIN_KEY } from './shop/ShopViews';
 
 type Order = { reference: string; status: string; total: number; pickup_code: string | null; created_at: string | null; items: { name: string; color?: string | null; size?: string | null; quantity: number; line_total: number }[] };
 
+/** Paystack's return page. Sends the buyer back to the dashboard when checkout started there. */
 export default function OrderPaidPage({ reference }: { reference: string }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [fromDashboard, setFromDashboard] = useState(false);
 
   useEffect(() => {
+    try { setFromDashboard(window.sessionStorage.getItem(CHECKOUT_ORIGIN_KEY) === 'dashboard'); } catch { /* storage unavailable */ }
     const token = window.localStorage.getItem('jan-conf-session');
     if (!token) { setError('Please sign in again to view this order.'); setLoading(false); return; }
-    void fetch(apiUrl(`/shop/orders/${encodeURIComponent(reference)}/verify`), { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } }).then(async (response) => { const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.message || data.errors?.payment?.[0] || 'We could not verify this payment.'); return data; }).then((data) => { setOrder(data.order); window.localStorage.removeItem('jan-conf-cart'); toast.success('Show your pickup QR code at the conference store.', { title: 'Payment successful' }); }).catch((requestError) => { const text = errorMessage(requestError, 'We could not verify this payment.'); setError(text); toast.error(text, { title: 'Payment not verified' }); }).finally(() => setLoading(false));
+    void fetch(apiUrl(`/shop/orders/${encodeURIComponent(reference)}/verify`), { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } })
+      .then(async (response) => { const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.message || data.errors?.payment?.[0] || 'We could not verify this payment.'); return data; })
+      .then((data) => {
+        setOrder(data.order);
+        try { window.localStorage.removeItem('jan-conf-cart'); window.sessionStorage.removeItem(CHECKOUT_ORIGIN_KEY); } catch { /* storage unavailable */ }
+        toast.success('Show your pickup QR code at the conference store.', { title: 'Payment successful' });
+      })
+      .catch((requestError) => { const text = errorMessage(requestError, 'We could not verify this payment.'); setError(text); toast.error(text, { title: 'Payment not verified' }); })
+      .finally(() => setLoading(false));
   }, [reference]);
 
-  return <main className="miv-hub"><div className="p-2.5 sm:p-4"><HubNav variant="solid" /></div><section className="container-shell py-12 sm:py-16"><div className="mx-auto max-w-3xl">{loading && <div className="rounded-[2rem] bg-white p-10 text-center shadow-soft"><p className="font-display text-4xl uppercase">Confirming payment…</p><p className="mt-3 text-ink/60">Please keep this page open.</p></div>}{error && <div className="rounded-[2rem] bg-[#fff0ee] p-10 text-center"><p className="eyebrow">Payment status</p><h1 className="mt-3 font-display text-5xl uppercase text-coral">Verification needed</h1><p className="mx-auto mt-4 max-w-lg text-ink/65">{error}</p><Link href="/shop" className="button-primary mt-7">Return to shop</Link></div>}{order && order.status === 'paid' && order.pickup_code && <div className="rounded-[2rem] bg-white p-6 text-center shadow-soft sm:p-10"><p className="eyebrow text-[#34865e]">Payment successful</p><h1 className="mt-3 font-display text-6xl uppercase leading-none sm:text-8xl">Order paid.</h1><p className="mt-5 text-base leading-7 text-ink/65">Show this QR code at the conference store to collect your order.</p><div className="mt-8 rounded-2xl border-2 border-dashed border-ink/15 bg-[#f6f2e9] p-4 sm:p-8"><ShopQRCode value={order.pickup_code} large /><p className="mt-5 font-display text-3xl tracking-[.14em] sm:text-5xl">{order.pickup_code}</p><p className="mt-2 text-xs uppercase tracking-[.16em] text-ink/50">Pickup QR code</p></div><div className="mx-auto mt-8 max-w-md border-t border-ink/10 pt-6 text-left">{order.items.map((item, index) => <div key={`${item.name}-${index}`} className="flex justify-between gap-3 py-2 text-sm"><span>{item.name}{variantLabel(item) && <span className="text-ink/55"> · {variantLabel(item)}</span>} × {item.quantity}</span><strong>₦{item.line_total.toLocaleString()}</strong></div>)}<div className="mt-3 flex justify-between border-t border-ink/10 pt-4 font-bold"><span>Total paid</span><span>₦{order.total.toLocaleString()}</span></div></div><Link href="/dashboard" className="button-primary mt-8">Go to order history</Link></div>}</div></section><HubFooter /></main>;
+  const shopHref = fromDashboard ? '/dashboard/shop' : '/shop';
+
+  return (
+    <main className="miv-hub">
+      <div className="p-2.5 sm:p-4"><HubNav variant="solid" /></div>
+      <section className="container-shell py-10 sm:py-16">
+        <div className="mx-auto max-w-3xl">
+          {loading && <div className="rounded-[2rem] bg-white p-8 text-center shadow-soft sm:p-10"><p className="font-display text-3xl uppercase sm:text-4xl">Confirming payment…</p><p className="mt-3 text-ink/60">Please keep this page open.</p></div>}
+          {error && (
+            <div className="rounded-[2rem] bg-[#fff0ee] p-7 text-center sm:p-10">
+              <p className="eyebrow">Payment status</p>
+              <h1 className="mt-3 font-display text-4xl uppercase text-coral sm:text-5xl">Verification needed</h1>
+              <p className="mx-auto mt-4 max-w-lg text-ink/65">{error}</p>
+              <Link href={shopHref} className="button-primary mt-7">Return to shop</Link>
+            </div>
+          )}
+          {order && order.status === 'paid' && order.pickup_code && (
+            <div className="rounded-[2rem] bg-white p-5 text-center shadow-soft sm:p-10">
+              <p className="eyebrow text-[#34865e]">Payment successful</p>
+              <h1 className="mt-3 font-display text-5xl uppercase leading-none sm:text-8xl">Order paid.</h1>
+              <p className="mt-5 text-base leading-7 text-ink/65">Show this QR code at the conference store to collect your order.</p>
+              <div className="mt-8 rounded-2xl border-2 border-dashed border-ink/15 bg-[#f6f2e9] p-3 sm:p-8">
+                <ShopQRCode value={order.pickup_code} large />
+                <p className="mt-5 break-all font-display text-2xl tracking-[.1em] sm:text-5xl sm:tracking-[.14em]">{order.pickup_code}</p>
+                <p className="mt-2 text-xs uppercase tracking-[.16em] text-ink/50">Pickup QR code</p>
+              </div>
+              <div className="mx-auto mt-8 max-w-md border-t border-ink/10 pt-6 text-left">
+                {order.items.map((item, index) => <div key={`${item.name}-${index}`} className="flex justify-between gap-3 py-2 text-sm"><span>{item.name}{variantLabel(item) && <span className="text-ink/55"> · {variantLabel(item)}</span>} × {item.quantity}</span><strong className="shrink-0">₦{item.line_total.toLocaleString()}</strong></div>)}
+                <div className="mt-3 flex justify-between border-t border-ink/10 pt-4 font-bold"><span>Total paid</span><span>₦{order.total.toLocaleString()}</span></div>
+              </div>
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <Link href="/dashboard/order-history" className="button-primary">{fromDashboard ? 'Back to my dashboard' : 'Go to order history'}</Link>
+                <Link href={shopHref} className="px-4 py-3 text-sm font-bold text-[#1469a9]">Keep shopping</Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+      <HubFooter />
+    </main>
+  );
 }

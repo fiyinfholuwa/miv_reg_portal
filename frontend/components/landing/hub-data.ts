@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiUrl } from '../../lib/api';
+import { SESSION_CHANGED_EVENT, clearSession, readSession } from '../../lib/events';
 import { productSlug } from '../../lib/shop';
 
 export type HubEvent = {
@@ -112,13 +113,22 @@ export function nextEventSlug(events: HubEvent[]) {
 export function useHasSession() {
   const [hasSession, setHasSession] = useState(false);
   useEffect(() => {
-    try {
-      setHasSession(Boolean(window.localStorage.getItem('jan-conf-session')));
-    } catch {
-      setHasSession(false);
-    }
+    const check = () => setHasSession(Boolean(readSession()));
+    check();
+    window.addEventListener(SESSION_CHANGED_EVENT, check);
+    return () => window.removeEventListener(SESSION_CHANGED_EVENT, check);
   }, []);
   return hasSession;
+}
+
+/** Signs out of the current device and returns to the home page. */
+export async function logout() {
+  const token = readSession();
+  if (token) {
+    await fetch(apiUrl('/auth/logout'), { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } }).catch(() => undefined);
+  }
+  clearSession();
+  window.location.assign('/');
 }
 
 export function useCountdown(target = COUNTDOWN_TARGET) {

@@ -26,6 +26,7 @@ use Laravel\Sanctum\HasApiTokens;
     'needs_accommodation',
     'registration_completed_at',
     'is_admin',
+    'admin_permissions',
     'approval_status',
     'ticket_code',
 ])]
@@ -49,7 +50,31 @@ class User extends Authenticatable
             'needs_accommodation' => 'boolean',
             'registration_completed_at' => 'datetime',
             'is_admin' => 'boolean',
+            'admin_permissions' => 'array',
+            'broadcasts_seen_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Admin areas this account may use. Null permissions mean full access.
+     *
+     * @param  string|list<string>  $permissions  Any one of these is enough.
+     */
+    public function hasAdminPermission(string|array $permissions): bool
+    {
+        if (! $this->is_admin) {
+            return false;
+        }
+        if ($this->admin_permissions === null) {
+            return true;
+        }
+
+        return array_intersect((array) $permissions, $this->admin_permissions) !== [];
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->is_admin && $this->admin_permissions === null;
     }
 
     public function hasCompletedRegistration(): bool
@@ -75,6 +100,11 @@ class User extends Authenticatable
     public function eventRegistrations(): HasMany
     {
         return $this->hasMany(EventRegistration::class);
+    }
+
+    public function pushSubscriptions(): HasMany
+    {
+        return $this->hasMany(PushSubscription::class);
     }
 
     public function shopCartItems(): HasMany
